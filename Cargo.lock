@@ -1,0 +1,32 @@
+[root]
+name = "rfsmp"
+version = "0.1.0"
+dependencies = [
+ "fmod 0.9.20 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "byteorder"
+version = "0.3.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "c_vec"
+version = "1.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "fmod"
+version = "0.9.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "byteorder 0.3.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "c_vec 1.0.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "libc"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+

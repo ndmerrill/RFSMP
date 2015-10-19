@@ -1,0 +1,7 @@
+[package]
+name = "rfsmp"
+version = "0.1.0"
+authors = ["Nathanael Merrill <nathan.d.merrill@gmail.com>"]
+
+[dependencies]
+fmod = "*"
