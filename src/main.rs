@@ -13,10 +13,12 @@
 //  limitations under the License.
 
 extern crate rfmod;
+extern crate argparse;
 
 mod playlist;
 
 use std::io;
+use argparse::{ArgumentParser, Store, List};
 
 enum UIResult {
     Play,
@@ -102,6 +104,27 @@ fn main_loop(rfmod: &rfmod::Sys, playlist: playlist::Playlist) -> rfmod::Result 
 }
 
 fn main() {
+
+    let mut regex = "".to_string();
+    let mut songs : Vec<String> = vec!();
+    {
+        let mut ap = ArgumentParser::new();
+        ap.set_description("Rust Fucking Simple Music Player");
+        ap.refer(&mut regex)
+            .add_option(&["-r", "--regex"], Store, "Use a regual expression");
+        ap.refer(&mut songs)
+            .add_argument("arguments", List, "Songs to play");
+        ap.parse_args_or_exit();
+    }
+
+    if (regex != "") {
+        println!("Regex not implemented");
+        return;
+    }
+    else {
+        // TODO
+    }
+
     let rfmod = match init_fmod() {
         Ok(f) => f,
         Err(e) => {

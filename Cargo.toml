@@ -19,3 +19,4 @@ authors = ["Nathanael Merrill <nathan.d.merrill@gmail.com>"]
 
 [dependencies]
 fmod = "*"
+argparse = "*"
