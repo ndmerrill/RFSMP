@@ -18,6 +18,14 @@ mod playlist;
 
 use std::io;
 
+enum UIResult {
+    Play,
+    Pause,
+    Exit,
+    Error,
+    NA,
+}
+
 fn init_fmod() -> Result<rfmod::Sys, rfmod::Result> {
     let fmod = try!(rfmod::Sys::new());
 
@@ -27,8 +35,70 @@ fn init_fmod() -> Result<rfmod::Sys, rfmod::Result> {
     }
 }
 
-fn make_channel(rfmod: &rfmod::Sys, song: &str) -> Result<rfmod::Sound, rfmod::Result> {
-    rfmod.create_sound(song, None, None)
+fn manage_ui() -> UIResult {
+    let stdin = io::stdin();
+
+    let mut input = String::new();
+    let read;
+
+    read = stdin.read_line(&mut input);
+    if read.is_err() {
+        return UIResult::Error;
+    }
+
+    match &*input {
+        "l\n" => UIResult::Play,
+        "p\n" => UIResult::Pause,
+        "x\n" => UIResult::Exit,
+        _ => {
+            println!("Unknown Command");
+            UIResult::NA
+        }
+    }
+}
+
+fn main_loop(rfmod: &rfmod::Sys, playlist: playlist::Playlist) -> rfmod::Result {
+    let sound = match rfmod.create_sound(playlist.get_next_song(), None, None) {
+        Ok(f) => f,
+        Err(e) => {
+            println!("Make sound error {:?}", e);
+            return e;
+        }
+    };
+
+    let chan = match sound.play() {
+        Ok(f) => f,
+        Err(e) => {
+            println!("Chan error {:?}", e);
+            return e;
+        }
+    };
+
+    loop {
+        match manage_ui() {
+            UIResult::Play => {
+                println!("play");
+                chan.set_paused(false);
+            }
+            UIResult::Pause => {
+                println!("pause");
+                chan.set_paused(true);
+            }
+            UIResult::Exit => {
+                println!("exit");
+                chan.stop();
+                break;
+            }
+            UIResult::Error => {
+                println!("error");
+                chan.stop();
+                break;
+            }
+            UIResult::NA => {}
+        }
+    }
+
+    return rfmod::Result::Ok;
 }
 
 fn main() {
@@ -42,62 +112,11 @@ fn main() {
 
     let playlist = playlist::Playlist::new("/home/nathan/Downloads/left.mp3");
 
-    let songa = match make_channel(&rfmod, playlist.get_next_song()) {
-        Ok(f) => f,
-        Err(e) => {
-            println!("Make sound error {:?}", e);
-            return;
-        }
-    };
+    println!("Commands:");
+    println!("\tPlay : l");
+    println!("\tPause: p");
+    println!("\tExit : x");
 
-    let song = match songa.play() {
-        Ok(f) => f,
-        Err(e) => {
-            println!("Chan error {:?}", e);
-            return;
-        }
-    };
 
-    match song.is_playing() {
-        Ok(f) => println!("{}", f),
-        Err(e) => println!("{:?}", e),
-    }
-
-    let stdin = io::stdin();
-
-    let mut input = String::new();
-    let mut read;
-
-    loop {
-        // Make your choice
-        println!("Commands:");
-        println!("\tPlay : l");
-        println!("\tPause: p");
-        println!("\tExit : x");
-
-        input.clear();
-        read = stdin.read_line(&mut input);
-        if read.is_err() {
-            println!("Error: {}", read.unwrap_err());
-            return;
-        }
-
-        match &*input {
-            "l\n" => {
-                println!("play");
-                song.set_paused(false);
-            }
-            "p\n" => {
-                println!("pause");
-                song.set_paused(true);
-            }
-            "x\n" => {
-                println!("exit");
-                song.stop();
-                break;
-            }
-            _  => println!("Unknwon command."),
-        }
-    }
-    println!("Goodbye!");
+    main_loop(&rfmod, playlist);
 }
