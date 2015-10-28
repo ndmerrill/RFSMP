@@ -12,8 +12,6 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-use std::string;
-
 pub struct Playlist {
     songs: Vec<String>,
     song_index: i32,
