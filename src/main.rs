@@ -15,41 +15,12 @@
 extern crate argparse;
 
 mod playlist;
+mod default_ui;
 
-use std::io;
 use argparse::{ArgumentParser, Store, List};
+use default_ui::*;
 
-enum UIResult {
-    Play,
-    Pause,
-    Exit,
-    Error,
-    NA,
-}
-
-fn manage_ui() -> UIResult {
-    let stdin = io::stdin();
-
-    let mut input = String::new();
-    let read;
-
-    read = stdin.read_line(&mut input);
-    if read.is_err() {
-        return UIResult::Error;
-    }
-
-    match &*input {
-        "l\n" => UIResult::Play,
-        "p\n" => UIResult::Pause,
-        "x\n" => UIResult::Exit,
-        _ => {
-            println!("Unknown Command");
-            UIResult::NA
-        }
-    }
-}
-
-fn main_loop(playlist: &mut playlist::Playlist) {
+fn main_loop(playlist: &mut playlist::Playlist, ui: &UI) {
     let mut song_done = true;
     loop {
         if song_done == true {
@@ -60,12 +31,15 @@ fn main_loop(playlist: &mut playlist::Playlist) {
             song_done = false;
         }
 
-        match manage_ui() {
+        match ui.manage_ui() {
             UIResult::Play => {
                 println!("play");
             }
             UIResult::Pause => {
                 println!("pause");
+            }
+            UIResult::Next => {
+                println!("next");
             }
             UIResult::Exit => {
                 println!("exit");
@@ -106,10 +80,7 @@ fn main() {
 
     let mut playlist = playlist::Playlist::new(songs);
 
-    println!("Commands:");
-    println!("\tPlay : l");
-    println!("\tPause: p");
-    println!("\tExit : x");
+    let ui = UI::new();
 
-    main_loop(&mut playlist);
+    main_loop(&mut playlist, &ui);
 }
