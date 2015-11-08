@@ -24,35 +24,59 @@ use regex::Regex;
 
 fn main_loop(playlist: &mut playlist::Playlist, ui: &mut UI) {
     let mut song_done = true;
+    let mut adder = 0.01;
+    let mut song: String = String::from("");
+    let mut time = 0.0_f32;
+    let mut paused = false;
+    let mut song_nevermind = false;
     //let mut time = 0_f32;
+    let index = 0;
     loop {
-        if song_done == true {
-            let song = match playlist.get_next_song() {
-                Some(a) => a,
+        if song_done {
+            song = match playlist.get_next_song() {
+                Some(a) => a.to_string(),
                 None => break,
             };
             song_done = false;
+            time = 0.0;
+        } else if song_nevermind {
+            song = match playlist.get_prev_song() {
+                Some(a) => a.to_string(),
+                None => break,
+            };
+            song_nevermind = false;
+            time = 0.0;
         }
-        //time = time + 0.01;
-        //let totaltime = 150;
-        //let commitTime = time.round() as i32;
-        let commitTime = 35;
+        time = time + adder;
+        
         let totaltime = 150;
-        match ui.manage_ui("this is the song name from the player".to_string(), commitTime, totaltime) {
+        let commitTime = time.round() as i32;
+        /*let commitTime = 35;
+        
+        let totaltime = 150;*/
+        if commitTime == totaltime - 1 {
+            song_done = true;
+        }
+        match ui.manage_ui(song.to_string(), commitTime, totaltime) {
             UIResult::Play => {
-                println!("play");
+                adder = 0.01;
             }
             UIResult::PlayPause => {
-                println!("play/pause");
+                paused = !paused;
+                match paused {
+                    true => adder = 0.0,
+                    false => adder = 0.01,
+                };
             }
             UIResult::Pause => {
-                println!("pause");
+                adder = 0.0;
             }
             UIResult::Previous => {
-                println!("previous");
+                song_nevermind = true;
             }
             UIResult::Next => {
-                println!("next");
+                //println!("next");
+                song_done = true;
             }
             UIResult::Exit => {
                 println!("exit");
@@ -88,12 +112,12 @@ fn main() {
         // TODO
     }
 
-    songs = vec![String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure/12 The Malibu Highlife.m4a"),
-    String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure 2.0/04 - Iceage Babeland.mp3")];
+    //songs = vec![String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure/12 The Malibu Highlife.m4a"),
+   // String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure 2.0/04 - Iceage Babeland.mp3")];
 
-    let mut playlist = playlist::Playlist::new(songs);
+    let mut playlist = playlist::Playlist::new(songs.clone());
 
-    let mut ui = UI::new();
+    let mut ui = UI::new(songs);
 
     main_loop(&mut playlist, &mut ui);
 }

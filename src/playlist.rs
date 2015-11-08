@@ -30,4 +30,12 @@ impl Playlist {
             None => None,
         }
     }
+    
+    pub fn get_prev_song(&mut self) -> Option<&str> {
+        self.song_index += -1;
+        match self.songs.get(self.song_index as usize) {
+            Some(a) => Some(&a),
+            None => None,
+        }
+    }
 }
