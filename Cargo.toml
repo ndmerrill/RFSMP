@@ -20,3 +20,4 @@ authors = ["Nathanael Merrill <nathan.d.merrill@gmail.com>"]
 [dependencies]
 argparse = "*"
 regex = "*"
+rustty = "*"

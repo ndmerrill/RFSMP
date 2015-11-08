@@ -11,7 +11,7 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-
+extern crate rustty;
 extern crate argparse;
 extern crate regex;
 
@@ -22,8 +22,9 @@ use argparse::{ArgumentParser, Store, List};
 use default_ui::*;
 use regex::Regex;
 
-fn main_loop(playlist: &mut playlist::Playlist, ui: &UI) {
+fn main_loop(playlist: &mut playlist::Playlist, ui: &mut UI) {
     let mut song_done = true;
+    //let mut time = 0_f32;
     loop {
         if song_done == true {
             let song = match playlist.get_next_song() {
@@ -32,8 +33,12 @@ fn main_loop(playlist: &mut playlist::Playlist, ui: &UI) {
             };
             song_done = false;
         }
-
-        match ui.manage_ui() {
+        //time = time + 0.01;
+        //let totaltime = 150;
+        //let commitTime = time.round() as i32;
+        let commitTime = 35;
+        let totaltime = 150;
+        match ui.manage_ui("this is the song name from the player".to_string(), commitTime, totaltime) {
             UIResult::Play => {
                 println!("play");
             }
@@ -82,7 +87,7 @@ fn main() {
 
     let mut playlist = playlist::Playlist::new(songs);
 
-    let ui = UI::new();
+    let mut ui = UI::new();
 
-    main_loop(&mut playlist, &ui);
+    main_loop(&mut playlist, &mut ui);
 }
