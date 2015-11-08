@@ -44,9 +44,6 @@ fn main() {
         // TODO
     }
 
-    //songs = vec![String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure/12 The Malibu Highlife.m4a"),
-                 //String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure 2.0/04 - Iceage Babeland.mp3")];
-
     println!("{}", songs[0]);
     let mut playlist = playlist::Playlist::new(songs);
 
@@ -60,7 +57,7 @@ fn main() {
     let mut bus;
     let mut bus_receiver;
 
-    let song = match playlist.get_next_song() {
+    let mut song = match playlist.get_next_song() {
         Some(a) => gst::filename_to_uri(a).unwrap(),
         None => panic!("can't get song"),
     };
@@ -71,6 +68,7 @@ fn main() {
     playbin.play();
 
     loop {
+        //println!("DURATION: {:?}", playbin.duration_s().unwrap_or(-1f64));
         loop {
             match bus_receiver.try_recv() {
                 Ok(message) => {
@@ -86,8 +84,22 @@ fn main() {
                             println!("eos received quiting");
                             break;
                         }
+                        gst::Message::TagParsed{ref msg, ref tags} => {
+                            //println!("Tag changed {}", (message.src()).name);
+                            println!("making song");
+                            song = match playlist.get_next_song() {
+                                Some(a) => gst::filename_to_uri(a).unwrap(),
+                                None => {
+                                    println!("All songs played");
+                                    break;
+                                }
+                            };
+                            playbin.set_uri(&song);
+                            println!("done making song");
+
+                        }
                         _ => {
-                            //println!("msg of type `{}` from element `{}`", message.type_name(), message.src_name());
+                            println!("msg of type `{}` from element `{}`", message.type_name(), message.src_name());
                         }
                     }
                 }
@@ -101,9 +113,9 @@ fn main() {
         }
 
 
-        match ui.manage_ui() {
+        /*match ui.manage_ui() {
             UIResult::Play => {
-                println!("play");
+                //println!("play");
             }
             UIResult::Pause => {
                 println!("pause");
@@ -120,7 +132,7 @@ fn main() {
                 break;
             }
             UIResult::NA => {}
-        }
+        }*/
     }
     main_loop.quit();
 }
