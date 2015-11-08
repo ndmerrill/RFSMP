@@ -33,23 +33,23 @@ use rustty::ui::{
 
 
 fn create_optiondlg(length: usize) -> Dialog {
-    let mut optiondlg = Dialog::new(length as usize, 6);
+    let mut optiondlg = Dialog::new(length as usize, 4);
     let inc_label = "space --> play/pause";
     //let dec_label = "p --> pause song";
-    let q_label = "x --> exit program";
+    let q_label = "x     --> exit program";
     let n_label = "n --> next song";
-    let pp_label = "p --> previous song";
+    let pp_label = "p --> prev song";
     let inc_pos = optiondlg.window().halign_line(inc_label, HorizontalAlign::Left, 1);
     //let dec_pos = optiondlg.window().halign_line(dec_label, HorizontalAlign::Left, 1);
     let q_pos = optiondlg.window().halign_line(q_label, HorizontalAlign::Left, 1);
-    let n_pos = optiondlg.window().halign_line(n_label, HorizontalAlign::Left, 1);
-    let pp_pos = optiondlg.window().halign_line(pp_label, HorizontalAlign::Left, 1);
+    let n_pos = optiondlg.window().halign_line(n_label, HorizontalAlign::Middle, 1);
+    let pp_pos = optiondlg.window().halign_line(pp_label, HorizontalAlign::Middle, 1);
 
     optiondlg.window_mut().printline(inc_pos, 1, inc_label);
     //optiondlg.window_mut().printline(dec_pos, 2, dec_label);
-    optiondlg.window_mut().printline(q_pos, 4, q_label);
-    optiondlg.window_mut().printline(n_pos, 2, n_label);
-    optiondlg.window_mut().printline(pp_pos, 3, pp_label);
+    optiondlg.window_mut().printline(q_pos, 2, q_label);
+    optiondlg.window_mut().printline(n_pos, 1, n_label);
+    optiondlg.window_mut().printline(pp_pos, 2, pp_label);
     optiondlg.window_mut().draw_box();
     optiondlg
 }
@@ -86,7 +86,7 @@ impl UI {
         optiondlg
             .window_mut()
             .align(&term, HorizontalAlign::Middle, VerticalAlign::Bottom, 0);
-        canvas.align(&term, HorizontalAlign::Middle, VerticalAlign::Bottom, 6);
+        canvas.align(&term, HorizontalAlign::Middle, VerticalAlign::Bottom, 4);
 
         UI {stdin: io::stdin(),
             term: term,
@@ -135,9 +135,7 @@ impl UI {
         let mut num = tnum as i32;
         num = length_i32 - num - 8;
         num = num / 2;
-        let spaces = "                                                                                                                                              ";
-        let mut append = spaces.chars().take(num as usize).collect::<String>();
-
+        let mut append = vec![' '; num as usize].into_iter().collect::<String>();
         let append2 = match length_i32.wrapping_rem(2) {
             0 => append.clone(),
             1 => append.clone() + " ",
