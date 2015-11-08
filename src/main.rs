@@ -42,8 +42,14 @@ fn main_loop(playlist: &mut playlist::Playlist, ui: &mut UI) {
             UIResult::Play => {
                 println!("play");
             }
+            UIResult::PlayPause => {
+                println!("play/pause");
+            }
             UIResult::Pause => {
                 println!("pause");
+            }
+            UIResult::Previous => {
+                println!("previous");
             }
             UIResult::Next => {
                 println!("next");
@@ -83,7 +89,7 @@ fn main() {
     }
 
     songs = vec![String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure/12 The Malibu Highlife.m4a"),
-                 String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure 2.0/04 - Iceage Babeland.mp3")];
+    String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure 2.0/04 - Iceage Babeland.mp3")];
 
     let mut playlist = playlist::Playlist::new(songs);
 
