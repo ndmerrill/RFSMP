@@ -13,12 +13,14 @@
 //  limitations under the License.
 
 extern crate argparse;
+extern crate regex;
 
 mod playlist;
 mod default_ui;
 
 use argparse::{ArgumentParser, Store, List};
 use default_ui::*;
+use regex::Regex;
 
 fn main_loop(playlist: &mut playlist::Playlist, ui: &UI) {
     let mut song_done = true;
@@ -55,7 +57,7 @@ fn main_loop(playlist: &mut playlist::Playlist, ui: &UI) {
 }
 
 fn main() {
-    let mut regex = "".to_string();
+    let mut regex = String::new();
     let mut songs : Vec<String> = vec![]; // TODO: add with capacity!
     {
         let mut ap = ArgumentParser::new();
@@ -68,8 +70,8 @@ fn main() {
     }
 
     if regex != "" {
-        println!("Regex not implemented");
-        return;
+        let re = Regex::new(&regex).unwrap();
+        songs.retain(|i| re.is_match(i));
     }
     else {
         // TODO
