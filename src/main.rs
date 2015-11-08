@@ -21,39 +21,7 @@ mod default_ui;
 use argparse::{ArgumentParser, Store, List};
 use default_ui::*;
 
-fn main_loop(playlist: &mut playlist::Playlist, ui: &UI) {
-    let mut song_done = true;
-    loop {
-        if song_done == true {
-            let song = match playlist.get_next_song() {
-                Some(a) => a,
-                None => break,
-            };
-            song_done = false;
-        }
-
-        match ui.manage_ui() {
-            UIResult::Play => {
-                println!("play");
-            }
-            UIResult::Pause => {
-                println!("pause");
-            }
-            UIResult::Next => {
-                println!("next");
-            }
-            UIResult::Exit => {
-                println!("exit");
-                break;
-            }
-            UIResult::Error => {
-                println!("error");
-                break;
-            }
-            UIResult::NA => {}
-        }
-    }
-}
+use gst::ElementT;
 
 fn main() {
     let mut regex = "".to_string();
@@ -76,12 +44,83 @@ fn main() {
         // TODO
     }
 
-    songs = vec![String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure/12 The Malibu Highlife.m4a"),
-                 String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure 2.0/04 - Iceage Babeland.mp3")];
+    //songs = vec![String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure/12 The Malibu Highlife.m4a"),
+                 //String::from("/home/nathan/Music/Brite Futures/Glistening Pleasure 2.0/04 - Iceage Babeland.mp3")];
 
+    println!("{}", songs[0]);
     let mut playlist = playlist::Playlist::new(songs);
 
     let ui = UI::new();
 
-    main_loop(&mut playlist, &ui);
+    gst::init();
+    let mut playbin = gst::PlayBin::new("audio_player")
+        .expect("Couldn't create playlist");
+    let mut main_loop = gst::MainLoop::new();
+
+    let mut bus;
+    let mut bus_receiver;
+
+    let song = match playlist.get_next_song() {
+        Some(a) => gst::filename_to_uri(a).unwrap(),
+        None => panic!("can't get song"),
+    };
+    playbin.set_uri(&song);
+    bus = playbin.bus().expect("Couldn't get pipeline bus");
+    bus_receiver = bus.receiver();
+    main_loop.spawn();
+    playbin.play();
+
+    loop {
+        loop {
+            match bus_receiver.try_recv() {
+                Ok(message) => {
+                    match message.parse(){
+                        gst::Message::StateChangedParsed{ref msg, ref old, ref new, ref pending} => {
+                            //println!("element `{}` changed from {:?} to {:?}", message.src_name(), old, new);
+                        }
+                        gst::Message::ErrorParsed{ref msg, ref error, ref debug} => {
+                            println!("error msg from element `{}`: {}, quitting", message.src_name(), error.message());
+                            break;
+                        }
+                        gst::Message::Eos(ref msg) => {
+                            println!("eos received quiting");
+                            break;
+                        }
+                        _ => {
+                            //println!("msg of type `{}` from element `{}`", message.type_name(), message.src_name());
+                        }
+                    }
+                }
+                Err(err) => {
+                    match err {
+                        std::sync::mpsc::TryRecvError::Empty => break,
+                        std::sync::mpsc::TryRecvError::Disconnected => println!("Dist"),
+                    }
+                }
+            }
+        }
+
+
+        match ui.manage_ui() {
+            UIResult::Play => {
+                println!("play");
+            }
+            UIResult::Pause => {
+                println!("pause");
+            }
+            UIResult::Next => {
+                println!("next");
+            }
+            UIResult::Exit => {
+                println!("exit");
+                break;
+            }
+            UIResult::Error => {
+                println!("error");
+                break;
+            }
+            UIResult::NA => {}
+        }
+    }
+    main_loop.quit();
 }
