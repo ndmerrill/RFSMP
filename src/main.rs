@@ -55,9 +55,9 @@ fn main() {
     let mut main_loop = gst::MainLoop::new();
 
     let mut bus;
-    let mut bus_receiver;
+    let bus_receiver;
 
-    let mut song = match playlist.get_next_song() {
+    let song = match playlist.get_next_song() {
         Some(a) => gst::filename_to_uri(a).unwrap(),
         None => panic!("can't get song"),
     };
@@ -67,39 +67,35 @@ fn main() {
     main_loop.spawn();
     playbin.play();
 
-    loop {
-        //println!("DURATION: {:?}", playbin.duration_s().unwrap_or(-1f64));
+    let mut song_buffered = false;
+
+    'outer: loop {
         loop {
             match bus_receiver.try_recv() {
                 Ok(message) => {
                     match message.parse(){
-                        gst::Message::StateChangedParsed{ref msg, ref old, ref new, ref pending} => {
-                            //println!("element `{}` changed from {:?} to {:?}", message.src_name(), old, new);
-                        }
-                        gst::Message::ErrorParsed{ref msg, ref error, ref debug} => {
+                        gst::Message::ErrorParsed{ref error, ..} => {
                             println!("error msg from element `{}`: {}, quitting", message.src_name(), error.message());
                             break;
                         }
-                        gst::Message::Eos(ref msg) => {
+                        gst::Message::Eos(ref _msg) => {
                             println!("eos received quiting");
-                            break;
+                            break 'outer;
                         }
-                        gst::Message::TagParsed{ref msg, ref tags} => {
-                            //println!("Tag changed {}", (message.src()).name);
-                            println!("making song");
-                            song = match playlist.get_next_song() {
-                                Some(a) => gst::filename_to_uri(a).unwrap(),
-                                None => {
-                                    println!("All songs played");
-                                    break;
-                                }
-                            };
-                            playbin.set_uri(&song);
-                            println!("done making song");
+                        gst::Message::StreamStart(ref _msg) => {
+                            song_buffered = false;
+                        }
+                        /*gst::Message::DurationChanged(ref msg) => {
+                            let stream_dir = playbin.duration_s();
+                            let stream_pos = playbin.position_s();
 
-                        }
+                            if stream_dir.is_some() && stream_pos.is_some() {
+                                println!("{}", stream_pos.unwrap());
+                                println!("{}", stream_dir.unwrap());
+                            }
+                        }*/
                         _ => {
-                            println!("msg of type `{}` from element `{}`", message.type_name(), message.src_name());
+                            //println!("msg of type `{}` from element `{}`", message.type_name(), message.src_name());
                         }
                     }
                 }
@@ -111,7 +107,30 @@ fn main() {
                 }
             }
         }
+        let stream_dir = playbin.duration_s();
+        let stream_pos = playbin.position_s();
 
+        if stream_dir.is_some() && stream_pos.is_some() && !song_buffered {
+            //println!("{}", stream_pos.unwrap());
+            //println!("{}", stream_dir.unwrap());
+            if stream_dir.unwrap() - stream_pos.unwrap() < 3.0 {
+                //println!("{}", stream_pos.unwrap());
+                //println!("{}", stream_dir.unwrap());
+                match playlist.get_next_song() {
+                    Some(a) => {
+                        println!("making song");
+                        let song = gst::filename_to_uri(a).unwrap();
+                        println!("{}", song);
+                        playbin.set_uri(&song);
+                        println!("done making song");
+                        song_buffered = true;
+                    }
+                    None => {
+                        //println!("All songs played");
+                    }
+                };
+            }
+        }
 
         /*match ui.manage_ui() {
             UIResult::Play => {
