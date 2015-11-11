@@ -173,7 +173,12 @@ impl UI {
             let mut num_x = 8.0;
             let mut num_not = 4.0;
 
-            num_x = time as f32 / totaltime as f32;
+            if totaltime == 0 { //TODO this is bad. fix it
+                num_x = 0.0;
+            }
+            else {
+                num_x = time as f32 / totaltime as f32;
+            }
             num_x = num_x * length_i32 as f32;
             num_not = length_i32 as f32 - num_x as f32;
 
