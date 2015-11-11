@@ -21,6 +21,4 @@ authors = ["Nathanael Merrill <nathan.d.merrill@gmail.com>"]
 argparse = "*"
 regex = "*"
 rustty = "*"
-
-[dependencies.gstreamer]
-path = "src/gstreamer"
+gstreamer = "*"
