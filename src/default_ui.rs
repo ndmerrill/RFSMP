@@ -141,7 +141,7 @@ impl UI {
     pub fn manage_ui(&mut self, songname :String,
                      time: i32, totaltime: i32)
         -> UIResult {
-            
+
             while let Some(Event::Key(ch)) = self.term.get_event(0).unwrap() {
                 match ch {
                     ' ' => return UIResult::PlayPause,

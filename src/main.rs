@@ -187,11 +187,11 @@ fn main() {
                 //println!("{}", stream_dir.unwrap());
                 match playlist.get_next_song() {
                     Some(a) => {
-                        println!("making song");
+                        //println!("making song");
                         let song = gst::filename_to_uri(a).unwrap();
-                        println!("{}", song);
+                        //println!("{}", song);
                         playbin.set_uri(&song);
-                        println!("done making song");
+                        //println!("done making song");
                         song_buffered = true;
                     }
                     None => {
