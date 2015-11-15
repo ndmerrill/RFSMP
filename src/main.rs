@@ -210,7 +210,7 @@ fn main() {
             None => 0,
         };
 
-        match ui.manage_ui(song.to_string(), stream_pos, stream_dir) {
+        match ui.manage_ui(&playlist, stream_pos, stream_dir) {
             UIResult::Play => {
                 //println!("play");
             }

@@ -12,6 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+use playlist;
+
 use std::io;
 use rustty::{
     Terminal,
@@ -72,7 +74,6 @@ pub struct UI {
     length: usize,
     height: usize,
     songs: Vec<String>,
-    currentsong: String,
 }
 //TODO, convert incoming strings from path to cool string
 impl UI {
@@ -82,7 +83,7 @@ impl UI {
         // (implement path_to_string manually)
         //  but only once nathan implements Paths
         // Create our terminal, dialog window and main canvasa
-        let currentsong = "".to_string();
+        let curr_song = "";
         let mut term = Terminal::new().unwrap();
         let length = term.cols();
         let height = term.rows();
@@ -104,7 +105,6 @@ impl UI {
             length: length,
             height: height,
             songs: songs,
-            currentsong: currentsong,
         }
     }
 
@@ -133,7 +133,8 @@ impl UI {
         }
 
     }
-    pub fn manage_ui(&mut self, songname :String,
+
+    pub fn manage_ui(&mut self, playlist: &playlist::Playlist,
                      time: i32, totaltime: i32) -> UIResult {
         //TODO: The rest of this function won't run if there is input
         //this is not really ideal
@@ -146,9 +147,10 @@ impl UI {
                 _  => return UIResult::NA,
             }
         }
-        self.currentsong = songname.clone();
+
+        let curr_song = playlist.get_curr_song().unwrap();
         let length_i32 = self.length as i32;
-        let tnum = time.to_string().len() + songname.len() + totaltime.to_string().len();
+        let tnum = time.to_string().len() + curr_song.len() + totaltime.to_string().len();
         let mut num = tnum as i32;
         num = length_i32 - num - 8;
         num = num / 2;
@@ -159,7 +161,7 @@ impl UI {
             _ => unreachable!(),
         };
         let display = format!("--{}{}--{}--{}{}--", time, append, 
-                              songname, append2, totaltime);
+                              curr_song, append2, totaltime);
 
         let v: Vec<char> = display.chars().collect();
         let (cols, rows) = self.canvas.size();
@@ -195,7 +197,7 @@ impl UI {
         }
 
         self.length_checker();
-        self.second_panel();
+        self.second_panel(curr_song);
         self.canvas.draw_into(&mut self.term);
         self.list_canvas.draw_into(&mut self.term);
         self.optiondlg.window().draw_into(&mut self.term);
@@ -203,7 +205,7 @@ impl UI {
         return UIResult::NA;
     }
 
-    fn second_panel(&mut self) {
+    fn second_panel(&mut self, curr_song: &str) {
         let cell = Cell::with_style(Color::Black, Color::Red, Attr::Default);
         let cellother = Cell::with_style(Color::Default, Color::Default, Attr::Default);
         let (cols, rows) = self.list_canvas.size();
@@ -214,7 +216,7 @@ impl UI {
         for i in 0..rows {
             let song = self.songs.get(counter).unwrap_or_else(|| &fep);
             self.list_canvas
-                .printline_with_cell(0, counter as usize, song, match &self.currentsong == song {
+                .printline_with_cell(0, counter as usize, song, match &curr_song == song {
                     true => cell,
                     false => cellother,
                 });
