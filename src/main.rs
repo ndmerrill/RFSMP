@@ -153,6 +153,7 @@ fn main() {
                         }
                         gst::Message::StreamStart(ref _msg) => {
                             song_buffered = false;
+                            playlist.go_to_next();
                         }
                         /*gst::Message::DurationChanged(ref msg) => {
                             let stream_dir = playbin.duration_s();
@@ -210,7 +211,7 @@ fn main() {
             None => 0,
         };
 
-        match ui.manage_ui(song.to_string(), stream_pos, stream_dir) {
+        match ui.manage_ui(&playlist, stream_pos, stream_dir) {
             UIResult::Play => {
                 //println!("play");
             }
