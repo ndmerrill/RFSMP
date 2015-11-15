@@ -148,7 +148,7 @@ impl UI {
             }
         }
 
-        let curr_song = playlist.get_curr_song().unwrap();
+        let curr_song = playlist.get_curr_song().unwrap_or("");
         let length_i32 = self.length as i32;
         let tnum = time.to_string().len() + curr_song.len() + totaltime.to_string().len();
         let mut num = tnum as i32;

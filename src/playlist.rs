@@ -24,19 +24,25 @@ impl Playlist {
     }
 
     pub fn get_next_song(&mut self) -> Option<&str> {
-        self.song_index += 1;
-        match self.songs.get(self.song_index as usize) {
+        match self.songs.get((self.song_index+1) as usize) {
             Some(a) => Some(&a),
             None => None,
         }
     }
 
+    pub fn go_to_next(&mut self) {
+        self.song_index += 1;
+    }
+
     pub fn get_prev_song(&mut self) -> Option<&str> {
-        self.song_index += -1;
-        match self.songs.get(self.song_index as usize) {
+        match self.songs.get((self.song_index-1) as usize) {
             Some(a) => Some(&a),
             None => None,
         }
+    }
+
+    pub fn go_to_prev(&mut self) {
+        self.song_index -= 1;
     }
 
     pub fn get_curr_song(&self) -> Option<&str> {

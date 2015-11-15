@@ -153,6 +153,7 @@ fn main() {
                         }
                         gst::Message::StreamStart(ref _msg) => {
                             song_buffered = false;
+                            playlist.go_to_next();
                         }
                         /*gst::Message::DurationChanged(ref msg) => {
                             let stream_dir = playbin.duration_s();
