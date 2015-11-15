@@ -13,7 +13,7 @@
 //  limitations under the License.
 
 pub struct Playlist {
-    songs: Vec<String>,
+    pub songs: Vec<String>,
     song_index: i32,
 }
 

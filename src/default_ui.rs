@@ -14,7 +14,6 @@
 
 use playlist;
 
-use std::io;
 use rustty::{
     Terminal,
     Event,
@@ -33,7 +32,7 @@ use rustty::ui::{
     VerticalAlign
 };
 
-fn create_optiondlg(length: usize) -> Dialog {
+fn create_info_dlg(length: usize) -> Dialog {
     let mut optiondlg = Dialog::new(length as usize, 4);
 
     let inc_label = "space --> play/pause";
@@ -55,69 +54,58 @@ fn create_optiondlg(length: usize) -> Dialog {
 }
 
 pub enum UIResult {
-    Play,
-    Pause,
+    PlayPause,
     Next,
+    Previous,
     Exit,
     Error,
-    PlayPause,
-    Previous,
     NA,
 }
 
 pub struct UI {
-    stdin: io::Stdin,
     term: Terminal,
     optiondlg: Dialog,
     canvas: Widget,
     list_canvas: Widget,
     length: usize,
     height: usize,
-    songs: Vec<String>,
 }
-//TODO, convert incoming strings from path to cool string
+
 impl UI {
-    pub fn new(songs: Vec<String>) -> UI {
-        // TODO this is where i should convert the vec<Path> to string
-        // by running the method path_to_string on ever single one. 
-        // (implement path_to_string manually)
-        //  but only once nathan implements Paths
+    pub fn new(playlist: &playlist::Playlist) -> UI {
         // Create our terminal, dialog window and main canvasa
-        let curr_song = "";
-        let mut term = Terminal::new().unwrap();
+        let term = Terminal::new().expect("Failed to make Rustty terminal");
         let length = term.cols();
         let height = term.rows();
+
         // aligns everything
-        let mut optiondlg = create_optiondlg(length);
+        let mut optiondlg = create_info_dlg(length);
         let mut canvas = Widget::new(length as usize, 2);
-        let mut list_canvas = Widget::new(length as usize, songs.len());
+        let mut list_canvas = Widget::new(length as usize,playlist.songs.len());
         optiondlg
             .window_mut()
             .align(&term, HorizontalAlign::Middle, VerticalAlign::Bottom, 0);
         canvas.align(&term, HorizontalAlign::Middle, VerticalAlign::Bottom, 4);
         list_canvas.align(&term, HorizontalAlign::Middle, VerticalAlign::Top, 0);
 
-        UI {stdin: io::stdin(),
-            term: term,
+        UI {term: term,
             optiondlg: optiondlg,
             canvas: canvas,
             list_canvas: list_canvas,
             length: length,
             height: height,
-            songs: songs,
         }
     }
 
     fn length_checker(&mut self) {
-        let last_length = self.length;
         let last_pos = (self.length, self.height);
         self.length = self.term.cols();
         self.height =  self.term.rows();
         match last_pos == (self.term.cols(), self.term.rows()){
             true => {},
             false => {
-                self.term.clear();
-                self.optiondlg = create_optiondlg(self.length);
+                self.term.clear(); //TODO Handle if this errors
+                self.optiondlg = create_info_dlg(self.length);
                 self.canvas = Widget::new(self.length as usize, 2);
                 self.optiondlg
                     .window_mut()
@@ -143,7 +131,7 @@ impl UI {
                 ' ' => return UIResult::PlayPause,
                 'p' => return UIResult::Previous,
                 'n' => return UIResult::Next,
-                'x' => return UIResult::Error,
+                'x' => return UIResult::Exit,
                 _  => return UIResult::NA,
             }
         }
@@ -154,20 +142,20 @@ impl UI {
         let mut num = tnum as i32;
         num = length_i32 - num - 8;
         num = num / 2;
-        let mut append = vec![' '; num as usize].into_iter().collect::<String>();
+        let append = vec![' '; num as usize].into_iter().collect::<String>();
         let append2 = match length_i32.wrapping_rem(2) {
             0 => append.clone(),
             1 => append.clone() + " ",
             _ => unreachable!(),
         };
-        let display = format!("--{}{}--{}--{}{}--", time, append, 
+        let display = format!("--{}{}--{}--{}{}--", time, append,
                               curr_song, append2, totaltime);
 
         let v: Vec<char> = display.chars().collect();
         let (cols, rows) = self.canvas.size();
         let (cols, rows) = (cols as isize, rows as isize);
-        let mut num_x = 8.0;
-        let mut num_not = 4.0;
+        let mut num_x;
+        let num_not;
 
         if totaltime == 0 { //TODO this is bad. fix it
             num_x = 0.0;
@@ -179,7 +167,7 @@ impl UI {
         num_not = length_i32 as f32 - num_x as f32;
 
         let mut va = vec!['x'; num_x.round() as usize];
-        let mut ev = vec!['-'; num_not.round() as usize];
+        let ev = vec!['-'; num_not.round() as usize];
         for x in ev {
             va.push(x);
         }
@@ -197,30 +185,29 @@ impl UI {
         }
 
         self.length_checker();
-        self.second_panel(curr_song);
+        self.second_panel(playlist, curr_song);
         self.canvas.draw_into(&mut self.term);
         self.list_canvas.draw_into(&mut self.term);
         self.optiondlg.window().draw_into(&mut self.term);
-        self.term.swap_buffers().unwrap();
+        self.term.swap_buffers().expect("swap buffers error");
         return UIResult::NA;
     }
 
-    fn second_panel(&mut self, curr_song: &str) {
+    fn second_panel(&mut self, playlist: &playlist::Playlist, curr_song: &str) {
         let cell = Cell::with_style(Color::Black, Color::Red, Attr::Default);
-        let cellother = Cell::with_style(Color::Default, Color::Default, Attr::Default);
-        let (cols, rows) = self.list_canvas.size();
-        let mut counter = 0;
-        let fep = "*".to_string();
-        //println!("{}", self.songs.get(counter).unwrap_or_else(|| &fep));
+        let cellother = Cell::with_style(Color::Default,
+                                         Color::Default,
+                                         Attr::Default);
+        let (_, rows) = self.list_canvas.size();
 
         for i in 0..rows {
-            let song = self.songs.get(counter).unwrap_or_else(|| &fep);
+            let song = playlist.songs.get(i).expect("get song failed");
             self.list_canvas
-                .printline_with_cell(0, counter as usize, song, match &curr_song == song {
-                    true => cell,
-                    false => cellother,
-                });
-            counter = counter + 1;
+                .printline_with_cell(0, i as usize, song,
+                                     match curr_song == song {
+                                         true => cell,
+                                         false => cellother,
+                                     });
         }
     }
 }
