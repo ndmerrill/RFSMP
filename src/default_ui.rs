@@ -141,9 +141,13 @@ impl UI {
         if self.time != (time, totaltime) {
             self.time = (time, totaltime);
 
+            if totaltime/60 > 99 {
+                panic!("RFSMP does not support songs longer than 100 minutes");
+            }
+
             let curr_song = playlist.get_curr_song().unwrap_or("");
             let length_i32 = self.length as i32;
-            let tnum = time.to_string().len() + curr_song.len() + totaltime.to_string().len();
+            let tnum = curr_song.len() + ((totaltime/60).to_string().len()+3)*2;
             let mut num = tnum as i32;
             num = length_i32 - num - 8;
             num = num / 2;
@@ -153,8 +157,10 @@ impl UI {
                 1 => append.clone() + " ",
                 _ => unreachable!(),
             };
-            let display = format!("--{}{}--{}--{}{}--", time, append,
-                                  curr_song, append2, totaltime);
+            let display = format!("--{:0>7$}:{:0>2}{}--{}--{}{:0>7$}:{:0>2}--",
+                                  time/60, time%60, append, curr_song, append2,
+                                  totaltime/60, totaltime%60,
+                                  (totaltime/60).to_string().len());
 
             let v: Vec<char> = display.chars().collect();
             let (cols, rows) = self.canvas.size();
