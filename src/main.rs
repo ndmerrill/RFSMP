@@ -125,20 +125,50 @@ fn main() {
 
         match ui.manage_ui(&playlist, stream_pos, stream_dir) {
             UIResult::PlayPause => {
-                println!("play/pause");
+                if playbin.is_paused() {
+                    playbin.play();
+                }
+                else {
+                    playbin.pause();
+                }
             }
             UIResult::Previous => {
-                println!("previous");
+                playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
+                playlist.go_to_prev();
+                playlist.go_to_prev();
+                match playlist.get_next_song() {
+                    Some(a) => {
+                        let song = gst::filename_to_uri(a).expect("URI error");
+                        playbin.set_uri(&song);
+                        song_buffered = true;
+                    }
+                    None => {
+                        println!("All songs played");
+                        break;
+                    }
+                };
+                playbin.play();
+
             }
             UIResult::Next => {
-                println!("next");
+                playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
+                match playlist.get_next_song() {
+                    Some(a) => {
+                        let song = gst::filename_to_uri(a).expect("URI error");
+                        playbin.set_uri(&song);
+                        song_buffered = true;
+                    }
+                    None => {
+                        println!("All songs played");
+                        break;
+                    }
+                };
+                playbin.play();
             }
             UIResult::Exit => {
-                println!("exit");
                 break;
             }
             UIResult::Error => {
-                println!("error");
                 break;
             }
             UIResult::NA => {}
