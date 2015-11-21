@@ -173,6 +173,7 @@ fn main() {
             }
             UIResult::NA => {}
         }
+        std::thread::sleep(std::time::Duration::new(0, 20000000));
     }
     main_loop.quit();
 }

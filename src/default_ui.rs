@@ -69,6 +69,7 @@ pub struct UI {
     list_canvas: Widget,
     length: usize,
     height: usize,
+    time: (i32, i32),
 }
 
 impl UI {
@@ -94,6 +95,7 @@ impl UI {
             list_canvas: list_canvas,
             length: length,
             height: height,
+            time: (-1,-1),
         }
     }
 
@@ -136,60 +138,64 @@ impl UI {
             }
         }
 
-        let curr_song = playlist.get_curr_song().unwrap_or("");
-        let length_i32 = self.length as i32;
-        let tnum = time.to_string().len() + curr_song.len() + totaltime.to_string().len();
-        let mut num = tnum as i32;
-        num = length_i32 - num - 8;
-        num = num / 2;
-        let append = vec![' '; num as usize].into_iter().collect::<String>();
-        let append2 = match length_i32.wrapping_rem(2) {
-            0 => append.clone(),
-            1 => append.clone() + " ",
-            _ => unreachable!(),
-        };
-        let display = format!("--{}{}--{}--{}{}--", time, append,
-                              curr_song, append2, totaltime);
+        if self.time != (time, totaltime) {
+            self.time = (time, totaltime);
 
-        let v: Vec<char> = display.chars().collect();
-        let (cols, rows) = self.canvas.size();
-        let (cols, rows) = (cols as isize, rows as isize);
-        let mut num_x;
-        let num_not;
-
-        if totaltime == 0 { //TODO this is bad. fix it
-            num_x = 0.0;
-        }
-        else {
-            num_x = time as f32 / totaltime as f32;
-        }
-        num_x = num_x * length_i32 as f32;
-        num_not = length_i32 as f32 - num_x as f32;
-
-        let mut va = vec!['x'; num_x.round() as usize];
-        let ev = vec!['-'; num_not.round() as usize];
-        for x in ev {
-            va.push(x);
-        }
-        //v.append(&mut va); unstable
-        for i in 0..cols*rows {
-            let y = i as isize / cols;
-            let x = i as isize % cols;
-            let fep ='*';
-            let mut cell = self.canvas.get_mut(x as usize, y as usize).unwrap();
-            match y {
-                0 => cell.set_ch(*v.get(x as usize).unwrap_or_else(|| &fep)),
-                1 => cell.set_ch(*va.get(x as usize).unwrap_or_else(|| &fep)),
-                _ => cell.set_ch(' '),
+            let curr_song = playlist.get_curr_song().unwrap_or("");
+            let length_i32 = self.length as i32;
+            let tnum = time.to_string().len() + curr_song.len() + totaltime.to_string().len();
+            let mut num = tnum as i32;
+            num = length_i32 - num - 8;
+            num = num / 2;
+            let append = vec![' '; num as usize].into_iter().collect::<String>();
+            let append2 = match length_i32.wrapping_rem(2) {
+                0 => append.clone(),
+                1 => append.clone() + " ",
+                _ => unreachable!(),
             };
-        }
+            let display = format!("--{}{}--{}--{}{}--", time, append,
+                                  curr_song, append2, totaltime);
 
-        self.length_checker();
-        self.second_panel(playlist, curr_song);
-        self.canvas.draw_into(&mut self.term);
-        self.list_canvas.draw_into(&mut self.term);
-        self.optiondlg.window().draw_into(&mut self.term);
-        self.term.swap_buffers().expect("swap buffers error");
+            let v: Vec<char> = display.chars().collect();
+            let (cols, rows) = self.canvas.size();
+            let (cols, rows) = (cols as isize, rows as isize);
+            let num_x;
+            let num_not;
+
+            if totaltime == 0 { //TODO this is bad. fix it
+                num_x = 0;
+            }
+            else {
+                num_x = (time as f32 / totaltime as f32
+                         * length_i32 as f32).round() as i32;
+            }
+            num_not = (length_i32 - num_x);
+
+            let mut va = vec!['x'; num_x as usize];
+            let ev = vec!['-'; num_not as usize];
+            for x in ev {
+                va.push(x);
+            }
+            //v.append(&mut va); unstable
+            for i in 0..cols*rows {
+                let y = i as isize / cols;
+                let x = i as isize % cols;
+                let fep ='*';
+                let mut cell = self.canvas.get_mut(x as usize, y as usize).unwrap();
+                match y {
+                    0 => cell.set_ch(*v.get(x as usize).unwrap_or_else(|| &fep)),
+                    1 => cell.set_ch(*va.get(x as usize).unwrap_or_else(|| &fep)),
+                    _ => cell.set_ch(' '),
+                };
+            }
+
+            self.length_checker();
+            self.second_panel(playlist, curr_song);
+            self.canvas.draw_into(&mut self.term);
+            self.list_canvas.draw_into(&mut self.term);
+            self.optiondlg.window().draw_into(&mut self.term);
+            self.term.swap_buffers().expect("swap buffers error");
+        }
         return UIResult::NA;
     }
 
