@@ -29,8 +29,10 @@ use rustty::ui::{
     Widget,
     Alignable,
     HorizontalAlign,
-    VerticalAlign
+    VerticalAlign,
 };
+
+use std::error::Error;
 
 fn create_info_dlg(length: usize) -> Dialog {
     let mut optiondlg = Dialog::new(length as usize, 4);
@@ -58,7 +60,7 @@ pub enum UIResult {
     Next,
     Previous,
     Exit,
-    Error,
+    Error(String),
     NA,
 }
 
@@ -99,14 +101,19 @@ impl UI {
         }
     }
 
-    fn length_checker(&mut self) {
+    fn length_checker(&mut self) -> String {
         let last_pos = (self.length, self.height);
         self.length = self.term.cols();
         self.height =  self.term.rows();
         match last_pos == (self.term.cols(), self.term.rows()){
             true => {},
             false => {
-                self.term.clear(); //TODO Handle if this errors
+                match self.term.clear() {
+                    Ok(_) => {},
+                    Err(e) => {
+                        return "Terminal clear error: ".to_string() + e.description()
+                    }
+                }
                 self.optiondlg = create_info_dlg(self.length);
                 self.canvas = Widget::new(self.length as usize, 2);
                 self.optiondlg
@@ -121,6 +128,7 @@ impl UI {
                                        VerticalAlign::Top, 0);
             },
         }
+        return "".to_string();
 
     }
 
@@ -142,7 +150,8 @@ impl UI {
             self.time = (time, totaltime);
 
             if totaltime/60 > 99 {
-                panic!("RFSMP does not support songs longer than 100 minutes");
+                return UIResult::Error(String::from(
+                    "RFSMP does not support songs longer than 100 minutes"));
             }
 
             let curr_song = playlist.get_curr_song().unwrap_or("");
@@ -175,7 +184,7 @@ impl UI {
                 num_x = (time as f32 / totaltime as f32
                          * length_i32 as f32).round() as i32;
             }
-            num_not = (length_i32 - num_x);
+            num_not = length_i32 - num_x;
 
             let mut va = vec!['x'; num_x as usize];
             let ev = vec!['-'; num_not as usize];
@@ -187,7 +196,11 @@ impl UI {
                 let y = i as isize / cols;
                 let x = i as isize % cols;
                 let fep ='*';
-                let mut cell = self.canvas.get_mut(x as usize, y as usize).unwrap();
+                let mut cell = match self.canvas.get_mut(x as usize, y as usize) {
+                    Some(a) => a,
+                    None => return UIResult::Error(
+                        "Could not draw to screen".to_string()),
+                };
                 match y {
                     0 => cell.set_ch(*v.get(x as usize).unwrap_or_else(|| &fep)),
                     1 => cell.set_ch(*va.get(x as usize).unwrap_or_else(|| &fep)),
@@ -195,17 +208,28 @@ impl UI {
                 };
             }
 
-            self.length_checker();
-            self.second_panel(playlist, curr_song);
+            let mut a = self.length_checker();
+            if a != "" {
+                return UIResult::Error(a);
+            }
+            a = self.second_panel(playlist, curr_song);
+            if a != "" {
+                return UIResult::Error(a);
+            }
             self.canvas.draw_into(&mut self.term);
             self.list_canvas.draw_into(&mut self.term);
             self.optiondlg.window().draw_into(&mut self.term);
-            self.term.swap_buffers().expect("swap buffers error");
+            match self.term.swap_buffers() {
+                Ok(_) => {},
+                Err(e) => return UIResult::Error(
+                    String::from("Swap buffers error: ".to_string() + e.description())),
+            }
         }
         return UIResult::NA;
     }
 
-    fn second_panel(&mut self, playlist: &playlist::Playlist, curr_song: &str) {
+    fn second_panel(&mut self, playlist: &playlist::Playlist, curr_song: &str) 
+                    -> String {
         let cell = Cell::with_style(Color::Black, Color::Red, Attr::Default);
         let cellother = Cell::with_style(Color::Default,
                                          Color::Default,
@@ -213,7 +237,10 @@ impl UI {
         let (_, rows) = self.list_canvas.size();
 
         for i in 0..rows {
-            let song = playlist.songs.get(i).expect("get song failed");
+            let song = match playlist.songs.get(i) {
+                Some(a) => a,
+                None => return String::from("Failed to look through songs"),
+            };
             self.list_canvas
                 .printline_with_cell(0, i as usize, song,
                                      match curr_song == song {
@@ -221,5 +248,6 @@ impl UI {
                                          false => cellother,
                                      });
         }
+        return String::from("");
     }
 }

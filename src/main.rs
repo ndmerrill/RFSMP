@@ -25,8 +25,11 @@ use regex::Regex;
 use gst::ElementT;
 
 fn main() {
+    let mut global_err = String::from("");
+    {
     let mut regex = String::new();
     let mut songs : Vec<String> = vec![]; // TODO: add with capacity!
+
     {
         let mut ap = ArgumentParser::new();
         ap.set_description("Rust Fucking Simple Music Player");
@@ -36,6 +39,11 @@ fn main() {
             .add_argument("arguments", List, "Songs to play");
         ap.parse_args_or_exit();
     }
+    if songs.len() == 0 {
+        println!("Usage:");
+        println!("    rfsmp [OPTIONS] [SONGS ...]");
+        return;
+    }
 
     if regex != "" {
         let re = Regex::new(&regex).expect("regex invalid");
@@ -43,8 +51,6 @@ fn main() {
     }
 
     let mut playlist = playlist::Playlist::new(songs);
-
-    let mut ui = UI::new(&playlist);
 
     gst::init();
     let mut playbin = gst::PlayBin::new("audio_player")
@@ -55,12 +61,16 @@ fn main() {
     let bus_receiver;
 
     let song = match playlist.get_next_song() {
-        Some(a) => gst::filename_to_uri(a).expect("filename error"),
+        Some(a) => gst::filename_to_uri(a).expect("URI Error"),
         None => panic!("can't get song"),
     };
+
     playbin.set_uri(&song);
     bus = playbin.bus().expect("Couldn't get pipeline bus");
     bus_receiver = bus.receiver();
+
+    let mut ui = UI::new(&playlist);
+
     main_loop.spawn();
     playbin.play();
 
@@ -72,8 +82,10 @@ fn main() {
                 Ok(message) => {
                     match message.parse(){
                         gst::Message::ErrorParsed{ref error, ..} => {
-                            panic!("error msg from element `{}`: {}, quit",
-                                     message.src_name(), error.message());
+                            global_err.push_str(
+                                &format!("error msg from element `{}`: {}, quit",
+                                        message.src_name(), error.message()));
+                            break 'outer;
                         }
                         gst::Message::Eos(ref _msg) => {
                             break 'outer;
@@ -103,7 +115,14 @@ fn main() {
             if stream_dir.unwrap() - stream_pos.unwrap() < 3.0 {
                 match playlist.get_next_song() {
                     Some(a) => {
-                        let song = gst::filename_to_uri(a).expect("URI error");
+                        let song = match gst::filename_to_uri(a) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                global_err.push_str("URI Error ");
+                                global_err.push_str(&e.message());
+                                break 'outer;
+                            }
+                        };
                         playbin.set_uri(&song);
                         song_buffered = true;
                     }
@@ -138,7 +157,14 @@ fn main() {
                 playlist.go_to_prev();
                 match playlist.get_next_song() {
                     Some(a) => {
-                        let song = gst::filename_to_uri(a).expect("URI error");
+                        let song = match gst::filename_to_uri(a) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                global_err.push_str("URI Error ");
+                                global_err.push_str(&e.message());
+                                break 'outer;
+                            }
+                        };
                         playbin.set_uri(&song);
                         song_buffered = true;
                     }
@@ -154,7 +180,14 @@ fn main() {
                 playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
                 match playlist.get_next_song() {
                     Some(a) => {
-                        let song = gst::filename_to_uri(a).expect("URI error");
+                        let song = match gst::filename_to_uri(a) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                global_err.push_str("URI Error ");
+                                global_err.push_str(&e.message());
+                                break 'outer;
+                            }
+                        };
                         playbin.set_uri(&song);
                         song_buffered = true;
                     }
@@ -168,12 +201,17 @@ fn main() {
             UIResult::Exit => {
                 break;
             }
-            UIResult::Error => {
-                break;
+            UIResult::Error(a) => {
+                global_err = a;
+                break 'outer;
             }
             UIResult::NA => {}
         }
         std::thread::sleep(std::time::Duration::new(0, 20000000));
     }
     main_loop.quit();
+    }
+    if global_err != "" {
+        println!("{}", global_err);
+    }
 }
