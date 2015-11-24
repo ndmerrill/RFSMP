@@ -19,26 +19,31 @@ extern crate regex;
 mod playlist;
 mod default_ui;
 
-use argparse::{ArgumentParser, Store, List};
+use argparse::{ArgumentParser, Store, StoreTrue, List};
 use default_ui::*;
 use regex::Regex;
 use gst::ElementT;
+use std::fs;
+use std::path::Path;
 
 fn main() {
     let mut global_err = String::from("");
     {
     let mut regex = String::new();
     let mut songs : Vec<String> = vec![]; // TODO: add with capacity!
-
+    let mut recurse = false;
     {
         let mut ap = ArgumentParser::new();
         ap.set_description("Rust Fucking Simple Music Player");
+        ap.refer(&mut recurse)
+            .add_option(&["-r", "--recursive"], StoreTrue, "Recurse through directories if passed them");
         ap.refer(&mut regex)
-            .add_option(&["-r", "--regex"], Store, "Use a regual expression");
+            .add_option(&["-s", "--search"], Store, "Search songs using regular expressions");
         ap.refer(&mut songs)
             .add_argument("arguments", List, "Songs to play");
         ap.parse_args_or_exit();
     }
+
     if songs.len() == 0 {
         println!("Usage:");
         println!("    rfsmp [OPTIONS] [SONGS ...]");
@@ -49,7 +54,22 @@ fn main() {
         let re = Regex::new(&regex).expect("regex invalid");
         songs.retain(|i| re.is_match(i));
     }
+    let mut append : Vec<String> = vec![];
 
+    if recurse {
+        let mut temp_list = songs.clone();
+        let mut append = temp_list.iter().filter(|a| fs::metadata(a).is_ok()).filter(|a| fs::metadata(a).unwrap().is_dir()).collect::<Vec<&String>>();
+        for dir in append {
+            let mut files = fs::read_dir(Path::new(dir)).unwrap();
+            for file in files {
+                let mut pass = file.unwrap().path();
+                match fs::metadata(&pass).unwrap().is_dir() {
+                    true => {},
+                    false => songs.push(pass.as_path().to_str().unwrap_or_else(|| "invalid char type").to_string())
+                }
+            }
+        }
+    }
     let mut playlist = playlist::Playlist::new(songs);
 
     gst::init();
