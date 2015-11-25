@@ -25,6 +25,7 @@ use regex::Regex;
 use gst::ElementT;
 use std::fs;
 use std::path::Path;
+use std::io;
 
 fn main() {
     let mut global_err = String::from("");
@@ -51,24 +52,20 @@ fn main() {
     }
 
     if regex != "" {
-        let re = Regex::new(&regex).expect("regex invalid");
+        let  re = Regex::new(&regex).expect("regex invalid");
         songs.retain(|i| re.is_match(i));
     }
-    let mut append : Vec<String> = vec![];
 
     if recurse {
-        let mut temp_list = songs.clone();
-        let mut append = temp_list.iter().filter(|a| fs::metadata(a).is_ok()).filter(|a| fs::metadata(a).unwrap().is_dir()).collect::<Vec<&String>>();
-        for dir in append {
-            let mut files = fs::read_dir(Path::new(dir)).unwrap();
-            for file in files {
-                let mut pass = file.unwrap().path();
-                match fs::metadata(&pass).unwrap().is_dir() {
-                    true => {},
-                    false => songs.push(pass.as_path().to_str().unwrap_or_else(|| "invalid char type").to_string())
-                }
+        let mut append : Vec<String> = vec![];
+        for song in songs.clone() {
+            if fs::metadata(&song).unwrap().is_dir() {
+                append.append(&mut recurse_songs(&song).unwrap());
+            } else {
+                append.push(song);
             }
         }
+        songs = append;
     }
     let mut playlist = playlist::Playlist::new(songs);
 
@@ -235,3 +232,18 @@ fn main() {
         println!("{}", global_err);
     }
 }
+
+fn recurse_songs(dir : &String) -> Result<Vec<String>, io::Error>{
+    let mut toAppend : Vec<String> = vec![];
+    if try!(fs::metadata(&dir)).is_dir() {
+        for entry in try!(fs::read_dir(dir)) {
+            match try!(fs::metadata(entry.unwrap().path())).is_dir() {
+                false => toAppend.push(second.unwrap().path().to_str().unwrap().to_string()),
+                true => {},
+            };
+         }
+    }
+    Ok(toAppend)
+}
+
+
