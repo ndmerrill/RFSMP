@@ -237,9 +237,10 @@ fn recurse_songs(dir : &String) -> Result<Vec<String>, io::Error>{
     let mut toAppend : Vec<String> = vec![];
     if try!(fs::metadata(&dir)).is_dir() {
         for entry in try!(fs::read_dir(dir)) {
-            match try!(fs::metadata(entry.unwrap().path())).is_dir() {
-                false => toAppend.push(second.unwrap().path().to_str().unwrap().to_string()),
-                true => {},
+            let memes = entry.unwrap().path();
+            match try!(fs::metadata(memes.clone())).is_dir() {
+                false => toAppend.push(memes.to_str().unwrap().to_string()),
+                true => toAppend.append(&mut recurse_songs(&memes.to_str().unwrap().to_string()).unwrap()),
             };
          }
     }
