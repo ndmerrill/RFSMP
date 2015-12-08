@@ -240,7 +240,8 @@ fn recurse_songs(dir : &String) -> Result<Vec<String>, io::Error>{
             let memes = entry.unwrap().path();
             match try!(fs::metadata(memes.clone())).is_dir() {
                 false => toAppend.push(memes.to_str().unwrap().to_string()),
-                true => toAppend.append(&mut recurse_songs(&memes.to_str().unwrap().to_string()).unwrap()),
+                true => toAppend.append(&mut recurse_songs(&memes.to_str().unwrap()
+                                                           .to_string()).unwrap()),
             };
          }
     }
