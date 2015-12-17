@@ -24,8 +24,22 @@ use default_ui::*;
 use regex::Regex;
 use gst::ElementT;
 use std::fs;
-use std::path::Path;
 use std::io;
+
+fn recurse_songs(dir : &String) -> Result<Vec<String>, io::Error>{
+    let mut to_append : Vec<String> = vec![];
+    if try!(fs::metadata(&dir)).is_dir() {
+        for entry in try!(fs::read_dir(dir)) {
+            let memes = entry.unwrap().path();
+            match try!(fs::metadata(memes.clone())).is_dir() {
+                false => to_append.push(memes.to_str().unwrap().to_string()),
+                true => to_append.append(&mut recurse_songs(&memes.to_str().unwrap()
+                                                           .to_string()).unwrap()),
+            };
+         }
+    }
+    Ok(to_append)
+}
 
 fn main() {
     let mut global_err = String::from("");
@@ -52,7 +66,7 @@ fn main() {
     }
 
     if regex != "" {
-        let  re = Regex::new(&regex).expect("regex invalid");
+        let re = Regex::new(&regex).expect("regex invalid");
         songs.retain(|i| re.is_match(i));
     }
 
@@ -232,20 +246,3 @@ fn main() {
         println!("{}", global_err);
     }
 }
-
-fn recurse_songs(dir : &String) -> Result<Vec<String>, io::Error>{
-    let mut toAppend : Vec<String> = vec![];
-    if try!(fs::metadata(&dir)).is_dir() {
-        for entry in try!(fs::read_dir(dir)) {
-            let memes = entry.unwrap().path();
-            match try!(fs::metadata(memes.clone())).is_dir() {
-                false => toAppend.push(memes.to_str().unwrap().to_string()),
-                true => toAppend.append(&mut recurse_songs(&memes.to_str().unwrap()
-                                                           .to_string()).unwrap()),
-            };
-         }
-    }
-    Ok(toAppend)
-}
-
-
