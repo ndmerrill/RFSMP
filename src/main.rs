@@ -26,19 +26,36 @@ use gst::ElementT;
 use std::fs;
 use std::io;
 
-fn recurse_songs(dir : &String) -> Result<Vec<String>, io::Error>{
-    let mut to_append : Vec<String> = vec![];
-    if try!(fs::metadata(&dir)).is_dir() {
-        for entry in try!(fs::read_dir(dir)) {
-            let memes = entry.unwrap().path();
-            match try!(fs::metadata(memes.clone())).is_dir() {
-                false => to_append.push(memes.to_str().unwrap().to_string()),
-                true => to_append.append(&mut recurse_songs(&memes.to_str().unwrap()
-                                                           .to_string()).unwrap()),
-            };
-         }
+fn recurse_songs(songs: &mut Vec<String>, recurse: bool, is_first: bool) ->
+                    Result<(), io::Error>{
+    let mut new : Vec<String> = vec![];
+
+    for song in songs.iter() {
+        if try!(fs::metadata(&song)).is_dir() {
+            if recurse || is_first {
+                let mut contents: Vec<String> = vec![];
+                for entry in try!(fs::read_dir(song)) {
+                    let memes = String::from(entry.unwrap().path().to_str().unwrap());
+                    contents.push(memes);
+                }
+                recurse_songs(&mut contents, recurse, false).unwrap();
+                new.append(&mut contents);
+            }
+            else {
+                println!("WARNING: Ignoring directory {}", song);
+                println!("Use -r to make recursive");
+                println!("Press Enter to continue");
+                let mut temp = String::new();
+                io::stdin().read_line(&mut temp);
+            }
+        }
+        else {
+            new.push(song.clone());
+        }
     }
-    Ok(to_append)
+    songs.clear();
+    songs.append(&mut new);
+    Ok(())
 }
 
 fn main() {
@@ -70,17 +87,13 @@ fn main() {
         songs.retain(|i| re.is_match(i));
     }
 
-    if recurse {
-        let mut append : Vec<String> = vec![];
-        for song in songs.clone() {
-            if fs::metadata(&song).unwrap().is_dir() {
-                append.append(&mut recurse_songs(&song).unwrap());
-            } else {
-                append.push(song);
-            }
-        }
-        songs = append;
+    let mut recur_one = false;
+    if songs.len() == 1 {
+        recur_one = true;
     }
+
+    recurse_songs(&mut songs, recurse, recur_one);
+
     let mut playlist = playlist::Playlist::new(songs);
 
     gst::init();
