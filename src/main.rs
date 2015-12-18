@@ -35,10 +35,14 @@ fn recurse_songs(songs: &mut Vec<String>, recurse: bool, is_first: bool) ->
             if recurse || is_first {
                 let mut contents: Vec<String> = vec![];
                 for entry in try!(fs::read_dir(song)) {
-                    let memes = String::from(entry.unwrap().path().to_str().unwrap());
+                    let memes = String::from(match try!(entry).path().to_str() {
+                        Some(a) => a,
+                        None => return Err(io::Error::new(
+                                io::ErrorKind::InvalidInput, "Failed to parse song file names.")),
+                    });
                     contents.push(memes);
                 }
-                recurse_songs(&mut contents, recurse, false).unwrap();
+                try!(recurse_songs(&mut contents, recurse, false));
                 new.append(&mut contents);
             }
             else {
@@ -46,7 +50,10 @@ fn recurse_songs(songs: &mut Vec<String>, recurse: bool, is_first: bool) ->
                 println!("Use -r to make recursive");
                 println!("Press Enter to continue");
                 let mut temp = String::new();
-                io::stdin().read_line(&mut temp);
+                match io::stdin().read_line(&mut temp) {
+                    Ok(_) => {},
+                    Err(err) => return Err(err),
+                }
             }
         }
         else {
@@ -76,6 +83,19 @@ fn main() {
         ap.parse_args_or_exit();
     }
 
+    let mut recur_one = false;
+    if songs.len() == 1 {
+        recur_one = true;
+    }
+
+    match recurse_songs(&mut songs, recurse, recur_one) {
+        Ok(_) => {},
+        Err(e) => {
+            println!("{}", e.to_string());
+            return;
+        }
+    }
+
     if songs.len() == 0 {
         println!("Usage:");
         println!("    rfsmp [OPTIONS] [SONGS ...]");
@@ -83,22 +103,30 @@ fn main() {
     }
 
     if regex != "" {
-        let re = Regex::new(&regex).expect("regex invalid");
+        let re = match Regex::new(&regex) {
+            Ok(o) => o,
+            Err(e) => {
+                println!("Regex invalid: {}", e.to_string());
+                return;
+            }
+        };
         songs.retain(|i| re.is_match(i));
+        if songs.len() == 0 {
+            println!("Failed to find songs matching regex patern.");
+            return;
+        }
     }
-
-    let mut recur_one = false;
-    if songs.len() == 1 {
-        recur_one = true;
-    }
-
-    recurse_songs(&mut songs, recurse, recur_one);
 
     let mut playlist = playlist::Playlist::new(songs);
 
     gst::init();
-    let mut playbin = gst::PlayBin::new("audio_player")
-        .expect("Couldn't create playlist");
+    let mut playbin = match gst::PlayBin::new("audio_player") {
+        Some(a) => a,
+        None => {
+            println!("Couldn't create PlayBin.");
+            return;
+        }
+    };
     let mut main_loop = gst::MainLoop::new();
 
     let mut bus;
@@ -106,12 +134,16 @@ fn main() {
 
     let song = match playlist.get_next_song() {
         Some(a) => gst::filename_to_uri(a).expect("URI Error"),
-        None => panic!("can't get song"),
+        None => {
+            println!("Can't get song.");
+            return;
+        }
     };
 
     playbin.set_uri(&song);
     bus = playbin.bus().expect("Couldn't get pipeline bus");
     bus_receiver = bus.receiver();
+
 
     let mut ui = UI::new(&playlist);
 
@@ -247,7 +279,7 @@ fn main() {
             }
             UIResult::Error(a) => {
                 global_err = a;
-                break 'outer;
+                break;
             }
             UIResult::NA => {}
         }
