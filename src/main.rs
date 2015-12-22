@@ -65,9 +65,161 @@ fn recurse_songs(songs: &mut Vec<String>, recurse: bool, is_first: bool) ->
     Ok(())
 }
 
+enum LoopResult {
+    Error(String),
+    Clean,
+}
+
+fn loop_main (bus_receiver: gst::bus::Receiver,
+              main_loop: &mut gst::mainloop::MainLoop,
+              playbin: &mut gst::PlayBin,
+              playlist: &mut playlist::Playlist) -> LoopResult {
+    let mut ui = UI::new(&playlist);
+
+    main_loop.spawn();
+    playbin.play();
+
+    let mut song_buffered = false;
+
+    'outer: loop {
+        loop {
+            match bus_receiver.try_recv() {
+                Ok(message) => {
+                    match message.parse(){
+                        gst::Message::ErrorParsed{ref error, ..} => {
+                            main_loop.quit();
+                            return LoopResult::Error(
+                                    format!("error msg from element `{}`: {}, quit",
+                                        message.src_name(), error.message()));
+                        }
+                        gst::Message::Eos(ref _msg) => {
+                            main_loop.quit();
+                            return LoopResult::Clean;
+                        }
+                        gst::Message::StreamStart(ref _msg) => {
+                            song_buffered = false;
+                            playlist.go_to_next();
+                        }
+                        _ => {
+                            //println!("msg of type `{}` from element `{}`",
+                            //         message.type_name(), message.src_name());
+                        }
+                    }
+                }
+                Err(err) => {
+                    match err {
+                        std::sync::mpsc::TryRecvError::Empty => break,
+                        std::sync::mpsc::TryRecvError::Disconnected => break,
+                    }
+                }
+            }
+        }
+
+        let stream_dir = playbin.duration_s();
+        let stream_pos = playbin.position_s();
+
+        if stream_dir.is_some() && stream_pos.is_some() && !song_buffered {
+            if stream_dir.unwrap() - stream_pos.unwrap() < 3.0 {
+                match playlist.get_next_song() {
+                    Some(a) => {
+                        let song = match gst::filename_to_uri(a) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                main_loop.quit();
+                                return LoopResult::Error(format!("URI Error {}",
+                                                &e.message()));
+                            }
+                        };
+                        playbin.set_uri(&song);
+                        song_buffered = true;
+                    }
+                    None => {
+                        //println!("All songs played");
+                    }
+                };
+            }
+        }
+
+        let stream_dir = match stream_dir {
+            Some(a) => a as i32,
+            None => 0,
+        };
+        let stream_pos = match stream_pos {
+            Some(a) => a as i32,
+            None => 0,
+        };
+
+        match ui.manage_ui(&playlist, stream_pos, stream_dir) {
+            UIResult::PlayPause => {
+                if playbin.is_paused() {
+                    playbin.play();
+                }
+                else {
+                    playbin.pause();
+                }
+            }
+            UIResult::Previous => {
+                playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
+                playlist.go_to_prev();
+                playlist.go_to_prev();
+                match playlist.get_next_song() {
+                    Some(a) => {
+                        let song = match gst::filename_to_uri(a) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                main_loop.quit();
+                                return LoopResult::Error(format!("URI Error {}",
+                                                        &e.message()));
+                            }
+                        };
+                        playbin.set_uri(&song);
+                        song_buffered = true;
+                    }
+                    None => {
+                        main_loop.quit();
+                        return LoopResult::Clean;
+                    }
+                };
+                playbin.play();
+
+            }
+            UIResult::Next => {
+                playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
+                match playlist.get_next_song() {
+                    Some(a) => {
+                        let song = match gst::filename_to_uri(a) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                main_loop.quit();
+                                return LoopResult::Error(format!("URI Error {}",
+                                                        &e.message()));
+                            }
+                        };
+                        playbin.set_uri(&song);
+                        song_buffered = true;
+                    }
+                    None => {
+                        main_loop.quit();
+                        return LoopResult::Clean;
+                    }
+                };
+                playbin.play();
+            }
+            UIResult::Exit => {
+                main_loop.quit();
+                return LoopResult::Clean;
+            }
+            UIResult::Error(a) => {
+                main_loop.quit();
+                return LoopResult::Error(a);
+            }
+            UIResult::NA => {}
+        }
+        std::thread::sleep(std::time::Duration::new(0, 20000000));
+    }
+}
+
 fn main() {
-    let mut global_err = String::from("");
-    {
     let mut regex = String::new();
     let mut songs : Vec<String> = vec![]; // TODO: add with capacity!
     let mut recurse = false;
@@ -144,150 +296,8 @@ fn main() {
     bus = playbin.bus().expect("Couldn't get pipeline bus");
     bus_receiver = bus.receiver();
 
-
-    let mut ui = UI::new(&playlist);
-
-    main_loop.spawn();
-    playbin.play();
-
-    let mut song_buffered = false;
-
-    'outer: loop {
-        loop {
-            match bus_receiver.try_recv() {
-                Ok(message) => {
-                    match message.parse(){
-                        gst::Message::ErrorParsed{ref error, ..} => {
-                            global_err.push_str(
-                                &format!("error msg from element `{}`: {}, quit",
-                                        message.src_name(), error.message()));
-                            break 'outer;
-                        }
-                        gst::Message::Eos(ref _msg) => {
-                            break 'outer;
-                        }
-                        gst::Message::StreamStart(ref _msg) => {
-                            song_buffered = false;
-                            playlist.go_to_next();
-                        }
-                        _ => {
-                            //println!("msg of type `{}` from element `{}`",
-                            //         message.type_name(), message.src_name());
-                        }
-                    }
-                }
-                Err(err) => {
-                    match err {
-                        std::sync::mpsc::TryRecvError::Empty => break,
-                        std::sync::mpsc::TryRecvError::Disconnected => break,
-                    }
-                }
-            }
-        }
-        let stream_dir = playbin.duration_s();
-        let stream_pos = playbin.position_s();
-
-        if stream_dir.is_some() && stream_pos.is_some() && !song_buffered {
-            if stream_dir.unwrap() - stream_pos.unwrap() < 3.0 {
-                match playlist.get_next_song() {
-                    Some(a) => {
-                        let song = match gst::filename_to_uri(a) {
-                            Ok(a) => a,
-                            Err(e) => {
-                                global_err.push_str("URI Error ");
-                                global_err.push_str(&e.message());
-                                break 'outer;
-                            }
-                        };
-                        playbin.set_uri(&song);
-                        song_buffered = true;
-                    }
-                    None => {
-                        //println!("All songs played");
-                    }
-                };
-            }
-        }
-
-        let stream_dir = match stream_dir {
-            Some(a) => a as i32,
-            None => 0,
-        };
-        let stream_pos = match stream_pos {
-            Some(a) => a as i32,
-            None => 0,
-        };
-
-        match ui.manage_ui(&playlist, stream_pos, stream_dir) {
-            UIResult::PlayPause => {
-                if playbin.is_paused() {
-                    playbin.play();
-                }
-                else {
-                    playbin.pause();
-                }
-            }
-            UIResult::Previous => {
-                playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
-                playlist.go_to_prev();
-                playlist.go_to_prev();
-                match playlist.get_next_song() {
-                    Some(a) => {
-                        let song = match gst::filename_to_uri(a) {
-                            Ok(a) => a,
-                            Err(e) => {
-                                global_err.push_str("URI Error ");
-                                global_err.push_str(&e.message());
-                                break 'outer;
-                            }
-                        };
-                        playbin.set_uri(&song);
-                        song_buffered = true;
-                    }
-                    None => {
-                        println!("All songs played");
-                        break;
-                    }
-                };
-                playbin.play();
-
-            }
-            UIResult::Next => {
-                playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
-                match playlist.get_next_song() {
-                    Some(a) => {
-                        let song = match gst::filename_to_uri(a) {
-                            Ok(a) => a,
-                            Err(e) => {
-                                global_err.push_str("URI Error ");
-                                global_err.push_str(&e.message());
-                                break 'outer;
-                            }
-                        };
-                        playbin.set_uri(&song);
-                        song_buffered = true;
-                    }
-                    None => {
-                        println!("All songs played");
-                        break;
-                    }
-                };
-                playbin.play();
-            }
-            UIResult::Exit => {
-                break;
-            }
-            UIResult::Error(a) => {
-                global_err = a;
-                break;
-            }
-            UIResult::NA => {}
-        }
-        std::thread::sleep(std::time::Duration::new(0, 20000000));
-    }
-    main_loop.quit();
-    }
-    if global_err != "" {
-        println!("{}", global_err);
+    match loop_main(bus_receiver, &mut main_loop, &mut playbin, &mut playlist) {
+        LoopResult::Error(e) => println!("{}", e),
+        LoopResult::Clean => {}
     }
 }
