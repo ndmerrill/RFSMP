@@ -34,6 +34,7 @@ use rustty::ui::{
 
 use std::error::Error;
 
+// Create the dialog that shows the keybindings. Should probably be removed.
 fn create_info_dlg(length: usize) -> Dialog {
     let mut optiondlg = Dialog::new(length as usize, 4);
 
@@ -55,6 +56,7 @@ fn create_info_dlg(length: usize) -> Dialog {
     optiondlg
 }
 
+// Tells main what happened to the UI and if the user sent any input.
 pub enum UIResult {
     PlayPause,
     Next,
@@ -101,37 +103,7 @@ impl UI {
         }
     }
 
-    fn length_checker(&mut self) -> String {
-        let last_pos = (self.length, self.height);
-        self.length = self.term.cols();
-        self.height =  self.term.rows();
-        match last_pos == (self.term.cols(), self.term.rows()){
-            true => {},
-            false => {
-                match self.term.clear() {
-                    Ok(_) => {},
-                    Err(e) => {
-                        return "Terminal clear error: ".to_string() + e.description()
-                    }
-                }
-                self.optiondlg = create_info_dlg(self.length);
-                self.canvas = Widget::new(self.length as usize, 2);
-                self.optiondlg
-                    .window_mut()
-                    .align(&self.term,
-                           HorizontalAlign::Middle,
-                           VerticalAlign::Bottom, 0);
-                self.canvas.align(&self.term,
-                                  HorizontalAlign::Middle,
-                                  VerticalAlign::Bottom, 6);
-                self.list_canvas.align(&self.term, HorizontalAlign::Left,
-                                       VerticalAlign::Top, 0);
-            },
-        }
-        return "".to_string();
-
-    }
-
+    // Updates the User Interface and gets user input.
     pub fn manage_ui(&mut self, playlist: &playlist::Playlist,
                      time: i32, totaltime: i32) -> UIResult {
         //TODO: The rest of this function won't run if there is input
@@ -156,56 +128,52 @@ impl UI {
 
             let curr_song = playlist.get_curr_song().unwrap_or("");
             let length_i32 = self.length as i32;
-            let tnum = curr_song.len() + ((totaltime/60).to_string().len()+3)*2;
-            let mut num = tnum as i32;
-            num = length_i32 - num - 8;
-            num = num / 2;
-            let append = vec![' '; num as usize].into_iter().collect::<String>();
-            let append2 = match length_i32.wrapping_rem(2) {
-                0 => append.clone(),
-                1 => append.clone() + " ",
+            let mut spaces = (curr_song.len() +
+                ((totaltime/60).to_string().len()+3)*2) as i32;
+            spaces = length_i32 - spaces - 8;
+            spaces = spaces / 2;
+
+            let spaces_l = vec![' '; spaces as usize].into_iter().collect::<String>();
+            let spaces_r = match (length_i32-curr_song.len() as i32).wrapping_rem(2) {
+                0 => spaces_l.clone(),
+                1 => spaces_l.clone() + " ",
                 _ => unreachable!(),
             };
-            let display = format!("--{:0>7$}:{:0>2}{}--{}--{}{:0>7$}:{:0>2}--",
-                                  time/60, time%60, append, curr_song, append2,
+            let status_chars: Vec<char> = format!("--{:0>7$}:{:0>2}{}--{}--{}{:0>7$}:{:0>2}--",
+                                  time/60, time%60, spaces_l, curr_song, spaces_r,
                                   totaltime/60, totaltime%60,
-                                  (totaltime/60).to_string().len());
+                                  (totaltime/60).to_string().len())
+                                  .chars().collect();
 
-            let v: Vec<char> = display.chars().collect();
             let (cols, rows) = self.canvas.size();
             let (cols, rows) = (cols as isize, rows as isize);
-            let num_x;
-            let num_not;
+            let number_of_x;
 
-            if totaltime == 0 { //TODO this is bad. fix it
-                num_x = 0;
+            if totaltime == 0 {
+                number_of_x = 0;
             }
             else {
-                num_x = (time as f32 / totaltime as f32
+                number_of_x = (time as f32 / totaltime as f32
                          * length_i32 as f32).round() as i32;
             }
-            num_not = length_i32 - num_x;
 
-            let mut va = vec!['x'; num_x as usize];
-            let ev = vec!['-'; num_not as usize];
-            for x in ev {
-                va.push(x);
-            }
-            //v.append(&mut va); unstable
-            for i in 0..cols*rows {
-                let y = i as isize / cols;
-                let x = i as isize % cols;
-                let fep ='*';
-                let mut cell = match self.canvas.get_mut(x as usize, y as usize) {
-                    Some(a) => a,
-                    None => return UIResult::Error(
-                        "Could not draw to screen".to_string()),
-                };
-                match y {
-                    0 => cell.set_ch(*v.get(x as usize).unwrap_or_else(|| &fep)),
-                    1 => cell.set_ch(*va.get(x as usize).unwrap_or_else(|| &fep)),
-                    _ => cell.set_ch(' '),
-                };
+            let mut load_chars = vec!['x'; number_of_x as usize];
+            load_chars.append(&mut vec!['-'; (length_i32 - number_of_x) as usize]);
+
+            for x in 0..cols {
+                for y in 0..rows {
+                    let fep ='*';
+                    let mut cell = match self.canvas.get_mut(x as usize, y as usize) {
+                        Some(a) => a,
+                        None => return UIResult::Error(
+                            "Could not draw to screen".to_string()),
+                    };
+                    match y {
+                        0 => cell.set_ch(*status_chars.get(x as usize).unwrap_or_else(|| &fep)),
+                        1 => cell.set_ch(*load_chars.get(x as usize).unwrap_or_else(|| &fep)),
+                        _ => unreachable!(),
+                    };
+                }
             }
 
             let mut a = self.length_checker();
@@ -228,6 +196,7 @@ impl UI {
         return UIResult::NA;
     }
 
+    // Draws the list of songs.
     fn second_panel(&mut self, playlist: &playlist::Playlist, curr_song: &str) 
                     -> String {
         let cell = Cell::with_style(Color::Black, Color::Red, Attr::Default);
@@ -249,5 +218,33 @@ impl UI {
                                      });
         }
         return String::from("");
+    }
+
+    // Checks to see if the terminal has changed size.
+    fn length_checker(&mut self) -> String {
+        let last_pos = (self.length, self.height);
+        self.length = self.term.cols();
+        self.height =  self.term.rows();
+        if last_pos != (self.term.cols(), self.term.rows()){
+            match self.term.clear() {
+                Ok(_) => {},
+                Err(e) => {
+                    return "Terminal clear error: ".to_string() + e.description()
+                }
+            }
+            self.optiondlg = create_info_dlg(self.length);
+            self.canvas = Widget::new(self.length as usize, 2);
+            self.optiondlg
+                .window_mut()
+                .align(&self.term,
+                       HorizontalAlign::Middle,
+                       VerticalAlign::Bottom, 0);
+            self.canvas.align(&self.term,
+                              HorizontalAlign::Middle,
+                              VerticalAlign::Bottom, 6);
+            self.list_canvas.align(&self.term, HorizontalAlign::Left,
+                                   VerticalAlign::Top, 0);
+        }
+        return "".to_string();
     }
 }
