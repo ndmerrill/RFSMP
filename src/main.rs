@@ -85,7 +85,7 @@ fn loop_main (bus_receiver: gst::bus::Receiver,
               main_loop: &mut gst::mainloop::MainLoop,
               playbin: &mut gst::PlayBin,
               playlist: &mut playlist::Playlist) -> LoopResult {
-    let mut ui = UI::new(&playlist);
+    let mut ui = UI::new();
 
     main_loop.spawn();
     playbin.play();

@@ -77,7 +77,7 @@ pub struct UI {
 }
 
 impl UI {
-    pub fn new(playlist: &playlist::Playlist) -> UI {
+    pub fn new() -> UI {
         // Create our terminal, dialog window and main canvasa
         let term = Terminal::new().expect("Failed to make Rustty terminal");
         let length = term.cols();
@@ -86,7 +86,7 @@ impl UI {
         // aligns everything
         let mut optiondlg = create_info_dlg(length);
         let mut canvas = Widget::new(length as usize, 2);
-        let mut list_canvas = Widget::new(length as usize,playlist.songs.len());
+        let mut list_canvas = Widget::new(length as usize,height-6);
         optiondlg
             .window_mut()
             .align(&term, HorizontalAlign::Middle, VerticalAlign::Bottom, 0);
@@ -194,7 +194,6 @@ impl UI {
             if a != "" {
                 return UIResult::Error(a);
             }
-
             self.canvas.draw_into(&mut self.term);
             self.list_canvas.draw_into(&mut self.term);
             self.optiondlg.window().draw_into(&mut self.term);
@@ -216,8 +215,25 @@ impl UI {
                                          Attr::Default);
         let (cols, rows) = self.list_canvas.size();
 
-        for i in 0..rows {
-            let song = match playlist.songs.get(i) {
+        let mut first_index = 0;
+        let steps;
+
+        if rows < playlist.songs.len() {
+            first_index = playlist.song_index as i32 - rows as i32/2;
+            if first_index < 0 {
+                first_index = 0;
+            }
+            else if playlist.songs.len() as i32-first_index < rows as i32 {
+                first_index = playlist.songs.len() as i32 - rows as i32;
+            }
+            steps = rows;
+        }
+        else {
+            steps = playlist.songs.len();
+        }
+
+        for i in 0..steps {
+            let song = match playlist.songs.get((i as i32 + first_index) as usize) {
                 Some(a) => a,
                 None => return String::from("Failed to look through songs"),
             };
@@ -228,6 +244,7 @@ impl UI {
             }
             else {
                 song_sized.push_str(song);
+                song_sized.push_str(&vec![' '; cols - song.len()].into_iter().collect::<String>());
             }
             self.list_canvas
                 .printline_with_cell(0, i as usize, &song_sized,
@@ -253,6 +270,7 @@ impl UI {
             }
             self.optiondlg = create_info_dlg(self.length);
             self.canvas = Widget::new(self.length as usize, 2);
+            self.list_canvas = Widget::new(self.length as usize,self.height-6);
             self.optiondlg
                 .window_mut()
                 .align(&self.term,

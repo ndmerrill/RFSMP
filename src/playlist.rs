@@ -14,7 +14,7 @@
 
 pub struct Playlist {
     pub songs: Vec<String>,
-    song_index: i32,
+    pub song_index: i32,
 }
 
 impl Playlist {
