@@ -118,7 +118,14 @@ impl UI {
             }
         }
 
-        if self.time != (time, totaltime) {
+        if self.time != (time, totaltime) ||
+            (self.length, self.height) != (self.term.cols(), self.term.rows()){
+
+            let mut a = self.length_checker();
+            if a != "" {
+                return UIResult::Error(a);
+            }
+
             self.time = (time, totaltime);
 
             if totaltime/60 > 99 {
@@ -176,10 +183,6 @@ impl UI {
                 }
             }
 
-            let mut a = self.length_checker();
-            if a != "" {
-                return UIResult::Error(a);
-            }
             a = self.second_panel(playlist, curr_song);
             if a != "" {
                 return UIResult::Error(a);
@@ -241,7 +244,7 @@ impl UI {
                        VerticalAlign::Bottom, 0);
             self.canvas.align(&self.term,
                               HorizontalAlign::Middle,
-                              VerticalAlign::Bottom, 6);
+                              VerticalAlign::Bottom, 4);
             self.list_canvas.align(&self.term, HorizontalAlign::Left,
                                    VerticalAlign::Top, 0);
         }
