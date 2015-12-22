@@ -134,20 +134,27 @@ impl UI {
             }
 
             let curr_song = playlist.get_curr_song().unwrap_or("");
+            let mut curr_song_visable = String::from(curr_song);
             let length_i32 = self.length as i32;
-            let mut spaces = (curr_song.len() +
+            let mut spaces = (curr_song_visable.len() +
                 ((totaltime/60).to_string().len()+3)*2) as i32;
             spaces = length_i32 - spaces - 8;
+            if spaces < 0 {
+                curr_song_visable = String::new();
+                curr_song_visable.push_str(&curr_song[0..(curr_song.len() as i32+(spaces)-5) as usize]);
+                curr_song_visable.push_str("...");
+                spaces = 2;
+            }
             spaces = spaces / 2;
 
             let spaces_l = vec![' '; spaces as usize].into_iter().collect::<String>();
-            let spaces_r = match (length_i32-curr_song.len() as i32).wrapping_rem(2) {
+            let spaces_r = match (length_i32-curr_song_visable.len() as i32).wrapping_rem(2) {
                 0 => spaces_l.clone(),
                 1 => spaces_l.clone() + " ",
                 _ => unreachable!(),
             };
             let status_chars: Vec<char> = format!("--{:0>7$}:{:0>2}{}--{}--{}{:0>7$}:{:0>2}--",
-                                  time/60, time%60, spaces_l, curr_song, spaces_r,
+                                  time/60, time%60, spaces_l, curr_song_visable, spaces_r,
                                   totaltime/60, totaltime%60,
                                   (totaltime/60).to_string().len())
                                   .chars().collect();
@@ -187,6 +194,7 @@ impl UI {
             if a != "" {
                 return UIResult::Error(a);
             }
+
             self.canvas.draw_into(&mut self.term);
             self.list_canvas.draw_into(&mut self.term);
             self.optiondlg.window().draw_into(&mut self.term);
@@ -206,15 +214,23 @@ impl UI {
         let cellother = Cell::with_style(Color::Default,
                                          Color::Default,
                                          Attr::Default);
-        let (_, rows) = self.list_canvas.size();
+        let (cols, rows) = self.list_canvas.size();
 
         for i in 0..rows {
             let song = match playlist.songs.get(i) {
                 Some(a) => a,
                 None => return String::from("Failed to look through songs"),
             };
+            let mut song_sized = String::new();
+            if song.len() >= cols {
+                song_sized.push_str(&song[0..cols-3]);
+                song_sized.push_str("...");
+            }
+            else {
+                song_sized.push_str(song);
+            }
             self.list_canvas
-                .printline_with_cell(0, i as usize, song,
+                .printline_with_cell(0, i as usize, &song_sized,
                                      match curr_song == song {
                                          true => cell,
                                          false => cellother,

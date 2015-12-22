@@ -117,14 +117,12 @@ fn loop_main (bus_receiver: gst::bus::Receiver,
                         }
                     }
                 }
-                Err(err) => {
-                    match err {
-                        std::sync::mpsc::TryRecvError::Empty => break,
-                        std::sync::mpsc::TryRecvError::Disconnected => break,
-                    }
+                Err(_) => {
+                    break;
                 }
             }
         }
+
 
         let stream_dir = playbin.duration_s();
         let stream_pos = playbin.position_s();
