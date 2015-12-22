@@ -26,6 +26,15 @@ use gst::ElementT;
 use std::fs;
 use std::io;
 
+// Takes a list of songs and directories the user wants to play and recurses
+// through the directories, replacing them in the list with the songs inside
+// them.
+//
+// If recurse is true, recurse_songs will follow nested directories to the
+// bottom.
+//
+// is_first allows rfsmp to recurse into a directory one level if the user
+// passes one directory as the only input.
 fn recurse_songs(songs: &mut Vec<String>, recurse: bool, is_first: bool) ->
                     Result<(), io::Error>{
     let mut new : Vec<String> = vec![];
@@ -65,11 +74,13 @@ fn recurse_songs(songs: &mut Vec<String>, recurse: bool, is_first: bool) ->
     Ok(())
 }
 
+// Results that loop_main can return
 enum LoopResult {
     Error(String),
     Clean,
 }
 
+// The main loop. Manages UI communications with gstreamer.
 fn loop_main (bus_receiver: gst::bus::Receiver,
               main_loop: &mut gst::mainloop::MainLoop,
               playbin: &mut gst::PlayBin,
@@ -220,6 +231,7 @@ fn loop_main (bus_receiver: gst::bus::Receiver,
 }
 
 fn main() {
+    // Get and parse user arguments.
     let mut regex = String::new();
     let mut songs : Vec<String> = vec![]; // TODO: add with capacity!
     let mut recurse = false;
@@ -269,6 +281,7 @@ fn main() {
         }
     }
 
+    // Initialize everything
     let mut playlist = playlist::Playlist::new(songs);
 
     gst::init();
@@ -284,6 +297,7 @@ fn main() {
     let mut bus;
     let bus_receiver;
 
+    // Send gstreamer the first song to get it started
     let song = match playlist.get_next_song() {
         Some(a) => gst::filename_to_uri(a).expect("URI Error"),
         None => {
@@ -296,6 +310,7 @@ fn main() {
     bus = playbin.bus().expect("Couldn't get pipeline bus");
     bus_receiver = bus.receiver();
 
+    // run main loop and handle errors
     match loop_main(bus_receiver, &mut main_loop, &mut playbin, &mut playlist) {
         LoopResult::Error(e) => println!("{}", e),
         LoopResult::Clean => {}

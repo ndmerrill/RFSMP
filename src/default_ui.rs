@@ -34,6 +34,7 @@ use rustty::ui::{
 
 use std::error::Error;
 
+// Create the dialog that shows the keybindings. Should probably be removed.
 fn create_info_dlg(length: usize) -> Dialog {
     let mut optiondlg = Dialog::new(length as usize, 4);
 
@@ -55,6 +56,7 @@ fn create_info_dlg(length: usize) -> Dialog {
     optiondlg
 }
 
+// Tells main what happened to the UI and if the user sent any input.
 pub enum UIResult {
     PlayPause,
     Next,
@@ -101,6 +103,7 @@ impl UI {
         }
     }
 
+    // Updates the User Interface and gets user input.
     pub fn manage_ui(&mut self, playlist: &playlist::Playlist,
                      time: i32, totaltime: i32) -> UIResult {
         //TODO: The rest of this function won't run if there is input
@@ -193,6 +196,7 @@ impl UI {
         return UIResult::NA;
     }
 
+    // Draws the list of songs.
     fn second_panel(&mut self, playlist: &playlist::Playlist, curr_song: &str) 
                     -> String {
         let cell = Cell::with_style(Color::Black, Color::Red, Attr::Default);
@@ -216,6 +220,7 @@ impl UI {
         return String::from("");
     }
 
+    // Checks to see if the terminal has changed size.
     fn length_checker(&mut self) -> String {
         let last_pos = (self.length, self.height);
         self.length = self.term.cols();
