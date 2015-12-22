@@ -20,5 +20,5 @@ authors = ["Nathanael Merrill <nathan.d.merrill@gmail.com>"]
 [dependencies]
 argparse = "*"
 regex = "*"
-rustty = "*"
+rustty = {version = "0.1.9", git = "https://github.com/cpjreynolds/rustty.git"}
 gstreamer = "*"

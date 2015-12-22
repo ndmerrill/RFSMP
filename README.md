@@ -8,29 +8,18 @@ Design goals:
   3. Can play music files selected with simple Regular Expressions.
   4. Full support of gapless playback.
 
-### Version
-Still in Alpha
-
 ### Installation
+
+RFSMP requires gstreamer to be installed.
 
 RFSMP can be built with cargo:
 
     cargo build
 
-### Development
-
-TODO
-
-### Todos
-
-TODO
-
 ### Credit
 Developers:
  * Nathanael Merrill
-
-Uses FMOD by Firelight Technologies
-
+ * Tommy Morriss
 
 ### License
     Copyright 2015 Nathanael Merrill
