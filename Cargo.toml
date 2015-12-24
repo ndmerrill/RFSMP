@@ -14,8 +14,11 @@
 
 [package]
 name = "rfsmp"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Nathanael Merrill <nathan.d.merrill@gmail.com>"]
 
 [dependencies]
 argparse = "*"
+regex = "*"
+rustty = {version = "0.1.9", git = "https://github.com/cpjreynolds/rustty.git"}
+gstreamer = "*"

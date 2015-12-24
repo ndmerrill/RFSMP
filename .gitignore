@@ -12,3 +12,6 @@
 
 # Vim swp files
 *.swp
+
+# Gstreamer unstable workaround
+/src/gstreamer/

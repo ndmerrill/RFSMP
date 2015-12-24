@@ -13,8 +13,8 @@
 //  limitations under the License.
 
 pub struct Playlist {
-    songs: Vec<String>,
-    song_index: i32,
+    pub songs: Vec<String>,
+    pub song_index: i32,
 }
 
 impl Playlist {
@@ -23,8 +23,27 @@ impl Playlist {
                  song_index: -1}
     }
 
+    // Returns the next song that should be played.
     pub fn get_next_song(&mut self) -> Option<&str> {
+        match self.songs.get((self.song_index+1) as usize) {
+            Some(a) => Some(&a),
+            None => None,
+        }
+    }
+
+    // Tells playlist that the current song is done and to proceed to the
+    // next one.
+    pub fn go_to_next(&mut self) {
         self.song_index += 1;
+    }
+
+    // Tells playlist to go back to the song before.
+    pub fn go_to_prev(&mut self) {
+        self.song_index -= 1;
+    }
+
+    // Returns the song that should currently be playing
+    pub fn get_curr_song(&self) -> Option<&str> {
         match self.songs.get(self.song_index as usize) {
             Some(a) => Some(&a),
             None => None,
