@@ -166,6 +166,9 @@ impl UI {
             if totaltime == 0 {
                 number_of_x = 0;
             }
+            else if totaltime < time {
+                number_of_x = length_i32;
+            }
             else {
                 number_of_x = (time as f32 / totaltime as f32
                          * length_i32 as f32).round() as i32;
