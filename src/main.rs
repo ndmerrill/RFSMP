@@ -71,6 +71,7 @@ fn recurse_songs(songs: &mut Vec<String>, recurse: bool, is_first: bool) ->
     }
     songs.clear();
     songs.append(&mut new);
+    songs.sort();
     Ok(())
 }
 
