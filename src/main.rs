@@ -15,17 +15,20 @@ extern crate rustty;
 extern crate gst;
 extern crate argparse;
 extern crate regex;
+extern crate ncurses;
 
 mod playlist;
-mod default_ui;
+mod ncurse_ui;
 
 use argparse::{ArgumentParser, Store, StoreTrue, List};
-use default_ui::*;
+use ncurse_ui::*;
 use regex::Regex;
 use gst::ElementT;
 use std::fs;
 use std::io;
-
+use ncurses::*;
+use std::thread;
+use std::sync::mpsc;
 // Takes a list of songs and directories the user wants to play and recurses
 // through the directories, replacing them in the list with the songs inside
 // them.
@@ -85,13 +88,16 @@ fn loop_main (bus_receiver: gst::bus::Receiver,
               main_loop: &mut gst::mainloop::MainLoop,
               playbin: &mut gst::PlayBin,
               playlist: &mut playlist::Playlist) -> LoopResult {
-    let mut ui = UI::new();
+    //hanle comms channel to the ui
+    let (tx, rx) = mpsc::channel();
+    let handle = thread::spawn(|| {
+        let mut ui = UI::new(tx);
+    });
 
     main_loop.spawn();
     playbin.play();
 
     let mut song_buffered = false;
-
     'outer: loop {
         loop {
             match bus_receiver.try_recv() {
@@ -157,78 +163,84 @@ fn loop_main (bus_receiver: gst::bus::Receiver,
             Some(a) => a as i32,
             None => 0,
         };
-
-        match ui.manage_ui(&playlist, stream_pos, stream_dir) {
-            UIResult::PlayPause => {
-                if playbin.is_paused() {
-                    playbin.play();
-                }
-                else {
-                    playbin.pause();
-                }
-            }
-            UIResult::Previous => {
-                playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
-                playlist.go_to_prev();
-                playlist.go_to_prev();
-                match playlist.get_next_song() {
-                    Some(a) => {
-                        let song = match gst::filename_to_uri(a) {
-                            Ok(a) => a,
-                            Err(e) => {
+        match rx.try_recv() {
+            Err(x) => {/*do nothing*/},
+            Ok(result) => {
+                match result {
+                    UIResult::PlayPause => {
+                        if playbin.is_paused() {
+                            playbin.play();
+                        }
+                        else {
+                            playbin.pause();
+                        }
+                    }
+                    UIResult::Previous => {
+                        playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
+                        playlist.go_to_prev();
+                        playlist.go_to_prev();
+                        match playlist.get_next_song() {
+                            Some(a) => {
+                                let song = match gst::filename_to_uri(a) {
+                                    Ok(a) => a,
+                                    Err(e) => {
+                                        main_loop.quit();
+                                        return LoopResult::Error(format!("URI Error {}",
+                                                                         &e.message()));
+                                    }
+                                };
+                                playbin.set_uri(&song);
+                                song_buffered = true;
+                            }
+                            None => {
                                 main_loop.quit();
-                                return LoopResult::Error(format!("URI Error {}",
-                                                        &e.message()));
+                                return LoopResult::Clean;
                             }
                         };
-                        playbin.set_uri(&song);
-                        song_buffered = true;
+                        playbin.play();
+
                     }
-                    None => {
+                    UIResult::Next => {
+                        playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
+                        match playlist.get_next_song() {
+                            Some(a) => {
+                                let song = match gst::filename_to_uri(a) {
+                                    Ok(a) => a,
+                                    Err(e) => {
+                                        main_loop.quit();
+                                        return LoopResult::Error(format!("URI Error {}",
+                                                                         &e.message()));
+                                    }
+                                };
+                                playbin.set_uri(&song);
+                                song_buffered = true;
+                            }
+                            None => {
+                                main_loop.quit();
+                                return LoopResult::Clean;
+                            }
+                        };
+                        playbin.play();
+                    }
+                    UIResult::Exit => {
                         main_loop.quit();
                         return LoopResult::Clean;
                     }
-                };
-                playbin.play();
-
-            }
-            UIResult::Next => {
-                playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
-                match playlist.get_next_song() {
-                    Some(a) => {
-                        let song = match gst::filename_to_uri(a) {
-                            Ok(a) => a,
-                            Err(e) => {
-                                main_loop.quit();
-                                return LoopResult::Error(format!("URI Error {}",
-                                                        &e.message()));
-                            }
-                        };
-                        playbin.set_uri(&song);
-                        song_buffered = true;
-                    }
-                    None => {
+                    UIResult::Error(a) => {
                         main_loop.quit();
-                        return LoopResult::Clean;
+                        return LoopResult::Error(a);
                     }
-                };
-                playbin.play();
-            }
-            UIResult::Exit => {
-                main_loop.quit();
-                return LoopResult::Clean;
-            }
-            UIResult::Error(a) => {
-                main_loop.quit();
-                return LoopResult::Error(a);
-            }
-            UIResult::NA => {}
+                    UIResult::NA => {}
+                }
+            },
         }
+        //change to match thread.recv() for none/some, than if its some then match the uiresult
         std::thread::sleep(std::time::Duration::new(0, 20000000));
     }
 }
 
 fn main() {
+
     // Get and parse user arguments.
     let mut regex = String::new();
     let mut songs : Vec<String> = vec![]; // TODO: add with capacity!
