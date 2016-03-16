@@ -12,10 +12,17 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
+
+//uifeature:
+// press / to start filter/seatch
+// change playlist to only display the things using regex filter of vector
+// refresh/serach only when ch thread stops hanging for maximum performance
 use playlist;
 use ncurses::*;
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::mpsc as cc;
+use std::thread;
 use std::error::Error;
 pub enum UIResult {
     PlayPause,
@@ -27,39 +34,65 @@ pub enum UIResult {
 }
 
 pub struct UI {
-    x: i32,
+    song_index: i32,
     y: i32,
 }
-//next step is to make the ui listing songs, and the step after that is to make the other window (rendered in main.rs)
-// that renders the timing progress bar based on the play loop
+//there are three threads, one that hangs on the keyinput (the ncurse one), one that hangs on retrieving the data from main(which prints the output), and the gstreamer loop
+//the cool part about this is that there is no looping in the ui, only hanging threads that send messages to awake other hanging threads
+
+//current bug is in a stack thread in mobile bookmarks folder
 impl UI {
 
-    pub fn new(tx :cc::Sender<UIResult>) -> UI {
+    pub fn new(tx :cc::Sender<UIResult>, recvr :cc::Receiver<i32>, pl :Vec<String>) -> UI {
         initscr();
+        noecho();
         refresh();
-        let mut rx :i32 = 0;
-        let mut ry :i32 = 0;
+        print_songs(&pl, 0);
+        let mut te = Arc::new(Mutex::new(tx));
+        thread::spawn(move || {
+            while true {
+                let mut ry :i32 = 0;
+                let mut rx :i32 = 0;
+                getmaxyx(stdscr, &mut ry, &mut rx);
+                // printw(&*string::from(rx.to_string() + " , " + &ry.to_string()));
+                let mut ch = getch();
+                printw(&*ch.to_string());
+                match ch {
+                    //n
+                    110 => {te.lock().unwrap().send(UIResult::Next);},
+                    //p
+                    112 => {te.lock().unwrap().send(UIResult::Previous);},
+                    //x
+                    120 => {te.lock().unwrap().send(UIResult::Exit);},
+                    //spc
+                    32 => {te.lock().unwrap().send(UIResult::PlayPause);},
+                    _ => {printw("no binding");}
+                }
+            };
+        });
         while true {
-            getmaxyx(stdscr, &mut ry, &mut rx);
-            // printw(&*String::from(rx.to_string() + " , " + &ry.to_string()));
-            let mut ch = getch();
-            // printw(&*ch.to_string()); -- good for finding keycodes
-            match ch {
-                //n
-                110 => {tx.send(UIResult::Next);},
-                //p
-                112 => {tx.send(UIResult::Previous);},
-                //x
-                120 => {tx.send(UIResult::Exit);},
-                //spc
-                32 => {tx.send(UIResult::PlayPause);},
-                _ => {printw("no binding");}
-            }
-            refresh();
-        }
+            let index = recvr.recv().unwrap();
+            print_songs(&pl, index);
+        };
         return UI {
-            x: 10,
+            song_index: 0,
             y: 3,
         };
     }
+
+}
+
+//we should have shared state here..... even though i just spent 1hr avoiding it.
+//if we dont, its rediculouse rewritten code.
+//try to make it shared state with arcs/mutex but dont put the arc::new inside the thread clojure u dummy
+//make the origional initiaition of playlist an arc, so that the gst part is also using arc
+fn print_songs(pl: &Vec<String>, indexa: i32) {
+    for (x , i) in pl.iter().zip(0..) {
+        let z = match (indexa == i) {
+            false => x.clone() + " ",
+            true => x.clone() + "x",
+        };
+        mvprintw(i, 0, &*z);
+    }
+    refresh();
 }

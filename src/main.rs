@@ -28,6 +28,7 @@ use std::fs;
 use std::io;
 use ncurses::*;
 use std::thread;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
 // Takes a list of songs and directories the user wants to play and recurses
 // through the directories, replacing them in the list with the songs inside
@@ -87,11 +88,13 @@ enum LoopResult {
 fn loop_main (bus_receiver: gst::bus::Receiver,
               main_loop: &mut gst::mainloop::MainLoop,
               playbin: &mut gst::PlayBin,
-              playlist: &mut playlist::Playlist) -> LoopResult {
+              playlist: &mut playlist::Playlist,
+              otherreciever: mpsc::Receiver<i32>)-> LoopResult {
     //hanle comms channel to the ui
     let (tx, rx) = mpsc::channel();
-    let handle = thread::spawn(|| {
-        let mut ui = UI::new(tx);
+    let shared = playlist.songs.clone();
+    thread::spawn(|| {
+        let mut ui = UI::new(tx, otherreciever, shared);
     });
 
     main_loop.spawn();
@@ -292,7 +295,8 @@ fn main() {
     }
 
     // Initialize everything
-    let mut playlist = playlist::Playlist::new(songs);
+    let (othersender, otherreciever) = mpsc::channel();
+    let mut playlist = playlist::Playlist::new(songs, othersender);
 
     gst::init();
     let mut playbin = match gst::PlayBin::new("audio_player") {
@@ -321,7 +325,7 @@ fn main() {
     bus_receiver = bus.receiver();
 
     // run main loop and handle errors
-    match loop_main(bus_receiver, &mut main_loop, &mut playbin, &mut playlist) {
+    match loop_main(bus_receiver, &mut main_loop, &mut playbin, &mut playlist, otherreciever) {
         LoopResult::Error(e) => println!("{}", e),
         LoopResult::Clean => {}
     }
