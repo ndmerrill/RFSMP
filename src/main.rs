@@ -227,6 +227,7 @@ fn loop_main (bus_receiver: gst::bus::Receiver,
                     }
                     UIResult::Exit => {
                         main_loop.quit();
+                        endwin();
                         return LoopResult::Clean;
                     }
                     UIResult::Error(a) => {

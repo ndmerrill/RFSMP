@@ -42,8 +42,8 @@ impl Playlist {
 
     // Tells playlist to go back to the song before.
     pub fn go_to_prev(&mut self) {
-        self.song_index -= 1;
         self.sender.send(self.song_index);
+        self.song_index -= 1;
     }
 
     // Returns the song that should currently be playing

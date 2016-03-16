@@ -47,16 +47,20 @@ impl UI {
         initscr();
         noecho();
         refresh();
+        start_color();
+        curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
+        init_pair(1, COLOR_RED, COLOR_BLACK);
+        init_pair(2, COLOR_GREEN, COLOR_BLACK);
         print_songs(&pl, 0);
-        let mut te = Arc::new(Mutex::new(tx));
-        thread::spawn(move || {
+        let mut te = Arc::new(Mutex::new(tx.clone()));
+        thread::Builder::new().name("ncursehanger".to_string()).spawn(move || {
             while true {
                 let mut ry :i32 = 0;
                 let mut rx :i32 = 0;
                 getmaxyx(stdscr, &mut ry, &mut rx);
                 // printw(&*string::from(rx.to_string() + " , " + &ry.to_string()));
                 let mut ch = getch();
-                printw(&*ch.to_string());
+                // printw(&*ch.to_string());
                 match ch {
                     //n
                     110 => {te.lock().unwrap().send(UIResult::Next);},
@@ -71,8 +75,11 @@ impl UI {
             };
         });
         while true {
-            let index = recvr.recv().unwrap();
-            print_songs(&pl, index);
+            let a = recvr.recv();
+            match a {
+                Ok(x) => {print_songs(&pl, x);},
+                Err(_) => {tx.send(UIResult::Exit);}
+            }
         };
         return UI {
             song_index: 0,
@@ -88,11 +95,13 @@ impl UI {
 //make the origional initiaition of playlist an arc, so that the gst part is also using arc
 fn print_songs(pl: &Vec<String>, indexa: i32) {
     for (x , i) in pl.iter().zip(0..) {
-        let z = match (indexa == i) {
-            false => x.clone() + " ",
-            true => x.clone() + "x",
+        match (indexa == i) {
+            false => {},
+            true => {attron(COLOR_PAIR(1));},
         };
-        mvprintw(i, 0, &*z);
+        mvprintw(i, 0, x);
+        attroff(COLOR_PAIR(1));
+        attron(COLOR_PAIR(2));
     }
     refresh();
 }
