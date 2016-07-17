@@ -22,3 +22,4 @@ argparse = "*"
 regex = "*"
 rustty = {version = "0.1.9", git = "https://github.com/cpjreynolds/rustty.git"}
 gstreamer = "*"
+ncurses = "*"
