@@ -11,10 +11,11 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
+extern crate ncurses;
 
 use playlist;
 
-use ncurses::*;
+use self::ncurses::*;
 
 pub enum UIResult {
     PlayPause,
@@ -34,6 +35,12 @@ pub struct UI {
 
 fn split_time(time: i32) -> String {
     return format!("{}:{:0>2}", time / 60, time % 60);
+}
+
+impl Drop for UI {
+    fn drop (&mut self) {
+        endwin();
+    }
 }
 
 impl UI {
@@ -88,9 +95,11 @@ impl UI {
             mvprintw(LINES-4, 0, &*format!("{:^1$}", song_name, COLS as usize));
 
             // list of songs
+
+            // handle scrolling
             let mut song_list;
             if playlist.songs.len() > (LINES-4) as usize {
-                let mut to_take = (playlist.song_index - (LINES-4)/2);
+                let mut to_take = playlist.song_index - (LINES-4)/2;
                 if playlist.songs.len() as i32 - to_take < LINES-4 {
                     to_take = playlist.songs.len() as i32 - (LINES-4);
                 }
@@ -102,6 +111,8 @@ impl UI {
             else {
                 song_list = playlist.songs.iter().skip(0);
             }
+
+            // print the songs
             for i in 0..LINES-4 {
                 let tmp = String::new();
                 let x = song_list.next().unwrap_or(&tmp);
@@ -109,7 +120,7 @@ impl UI {
                     false => {},
                     true => {attron(COLOR_PAIR(2));},
                 };
-                let mut visable = x.clone();
+                let visable;
                 if x.len() > COLS as usize {
                     visable = format!("{}...", &x[..(COLS-3) as usize]);
                 }

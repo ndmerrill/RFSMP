@@ -14,7 +14,6 @@
 extern crate gst;
 extern crate argparse;
 extern crate regex;
-extern crate ncurses;
 
 mod playlist;
 mod ncurse_ui;
@@ -25,7 +24,6 @@ use regex::Regex;
 use gst::ElementT;
 use std::fs;
 use std::io;
-use ncurses::*;
 
 // Takes a list of songs and directories the user wants to play and recurses
 // through the directories, replacing them in the list with the songs inside
@@ -314,5 +312,4 @@ fn main() {
         LoopResult::Error(e) => println!("{}", e),
         LoopResult::Clean => {}
     }
-    endwin();
 }
