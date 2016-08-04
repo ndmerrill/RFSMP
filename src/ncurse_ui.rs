@@ -33,11 +33,14 @@ pub enum UIResult {
 pub struct UI {
     cols: i32,
     lines: i32,
+    prev_time: i32,
+    prev_song_num: i32,
 }
-//there are three threads, one that hangs on the keyinput (the ncurse one), one that hangs on retrieving the data from main(which prints the output), and the gstreamer loop
-//the cool part about this is that there is no looping in the ui, only hanging threads that send messages to awake other hanging threads
 
-//current bug is in a stack thread in mobile bookmarks folder
+fn split_time(time: i32) -> String {
+    return format!("{}:{:0>2}", time / 60, time % 60);
+}
+
 impl UI {
     pub fn new() -> UI {
         initscr();
@@ -54,6 +57,8 @@ impl UI {
         UI {
             cols: COLS,
             lines: LINES,
+            prev_time: -1,
+            prev_song_num: -1,
         }
     }
 
@@ -70,89 +75,66 @@ impl UI {
         }
 
         if self.cols != COLS || self.lines != LINES {
-            //redraw
+            self.cols = COLS;
+            self.lines = LINES;
+            self.prev_time = -1;
+            self.prev_song_num = -1;
         }
 
-//if self.time != (time, totaltime) ||
-            //(self.length, self.height) != (self.term.cols(), self.term.rows()){
+        let squares;
 
-            //self.time = (time, totaltime);
-
-            //if totaltime/60 > 99 {
-                //return UIResult::Error(String::from(
-                    //"RFSMP does not support songs longer than 100 minutes"));
-            //}
-
-            //let curr_song = playlist.get_curr_song().unwrap_or("");
-            //let mut curr_song_visable = String::from(curr_song);
-            //let length_i32 = self.length as i32;
-            //let mut spaces = (curr_song_visable.len() +
-                //((totaltime/60).to_string().len()+3)*2) as i32;
-            //spaces = length_i32 - spaces - 8;
-            //if spaces < 0 {
-                //curr_song_visable = String::new();
-                //curr_song_visable.push_str(&curr_song[0..(curr_song.len() as i32+(spaces)-5) as usize]);
-                //curr_song_visable.push_str("...");
-                //spaces = 2;
-            //}
-            //spaces = spaces / 2;
-
-            //let spaces_l = vec![' '; spaces as usize].into_iter().collect::<String>();
-            //let spaces_r = match (length_i32-curr_song_visable.len() as i32).wrapping_rem(2) {
-                //0 => spaces_l.clone(),
-                //1 => spaces_l.clone() + " ",
-                //_ => unreachable!(),
-            //};
-            //let status_chars: Vec<char> = format!("--{:0>7$}:{:0>2}{}--{}--{}{:0>7$}:{:0>2}--",
-                                  //time/60, time%60, spaces_l, curr_song_visable, spaces_r,
-                                  //totaltime/60, totaltime%60,
-                                  //(totaltime/60).to_string().len())
-                                  //.chars().collect();
-
-            //let (cols, rows) = self.canvas.size();
-            //let (cols, rows) = (cols as isize, rows as isize);
-            //let number_of_x;
-
-            //if totaltime == 0 {
-                //number_of_x = 0;
-            //}
-            //else if totaltime < time {
-                //number_of_x = length_i32;
-            //}
-            //else {
-                //number_of_x = (time as f32 / totaltime as f32
-                         //* length_i32 as f32).round() as i32;
-            //}
-
-            //let mut load_chars = vec!['x'; number_of_x as usize];
-            //load_chars.append(&mut vec!['-'; (length_i32 - number_of_x) as usize]);
-
-            //for x in 0..cols {
-                //for y in 0..rows {
-                    //let fep ='*';
-                    //let mut cell = match self.canvas.get_mut(x as usize, y as usize) {
-                        //Some(a) => a,
-                        //None => return UIResult::Error(
-                            //"Could not draw to screen".to_string()),
-                    //};
-                    //match y {
-                        //0 => cell.set_ch(*status_chars.get(x as usize).unwrap_or_else(|| &fep)),
-                        //1 => cell.set_ch(*load_chars.get(x as usize).unwrap_or_else(|| &fep)),
-                        //_ => unreachable!(),
-                    //};
-                //}
-            //}
-
-        for (x, i) in playlist.songs.iter().zip(0..) {
-            match x == playlist.get_curr_song().unwrap_or("") {
-                false => {},
-                true => {attron(COLOR_PAIR(2));},
-            };
-            mvprintw(i, 0, x);
-            attron(COLOR_PAIR(1));
+        if time == 0 || totaltime == 0 {
+            squares = 0;
         }
+        else {
+            squares = (time as f64 / totaltime as f64 * COLS as f64) as usize;
+        }
+
+        if playlist.song_index != self.prev_song_num {
+            // redraw everything on song change
+
+            // song name
+            mvprintw(LINES-3, 0, &*format!("{:^1$}", playlist.get_curr_song().unwrap_or(""), COLS as usize));
+            // end time
+            mvprintw(LINES-2, 0, &*format!("{:>1$}", split_time(totaltime), COLS as usize));
+            // current time
+            mvprintw(LINES-2, 0, &*split_time(time));
+            self.prev_song_num = playlist.song_index;
+            self.prev_time = time;
+
+            for (x, i) in playlist.songs.iter().zip(0..) {
+                match x == playlist.get_curr_song().unwrap_or("") {
+                    false => {},
+                    true => {attron(COLOR_PAIR(2));},
+                };
+                let mut visable = x.clone();
+                if x.len() > COLS as usize {
+                    visable = format!("{}...", &x[..(COLS-3) as usize]);
+                }
+
+                mvprintw(i, 0, &*visable);
+                attron(COLOR_PAIR(1));
+            }
+
+            // progress bar
+            mvprintw(LINES-1, 0, &*format!("{:#<1$}{0:<2$}", "", squares, COLS as usize-squares));
+
+        }
+
+        else if time != self.prev_time {
+            // redraw the progress bar and times
+
+            // end time
+            mvprintw(LINES-2, 0, &*format!("{:>1$}", split_time(totaltime), COLS as usize));
+            // current time
+            mvprintw(LINES-2, 0, &*split_time(time));
+            self.prev_time = time;
+
+            // progress bar
+            mvprintw(LINES-1, 0, &*format!("{:#<1$}{0:<2$}", "", squares, COLS as usize-squares));
+        }
+
         refresh();
         return UIResult::NA;
     }
-
 }
