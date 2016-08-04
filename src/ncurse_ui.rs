@@ -12,11 +12,6 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-
-//uifeature:
-// press / to start filter/seatch
-// change playlist to only display the things using regex filter of vector
-// refresh/serach only when ch thread stops hanging for maximum performance
 use playlist;
 
 use ncurses::*;
@@ -81,28 +76,35 @@ impl UI {
             self.prev_song_num = -1;
         }
 
-        let squares;
-
-        if time == 0 || totaltime == 0 {
-            squares = 0;
-        }
-        else {
-            squares = (time as f64 / totaltime as f64 * COLS as f64) as usize;
-        }
-
         if playlist.song_index != self.prev_song_num {
             // redraw everything on song change
+            self.draw_times_and_bar(time, totaltime);
 
             // song name
-            mvprintw(LINES-3, 0, &*format!("{:^1$}", playlist.get_curr_song().unwrap_or(""), COLS as usize));
-            // end time
-            mvprintw(LINES-2, 0, &*format!("{:>1$}", split_time(totaltime), COLS as usize));
-            // current time
-            mvprintw(LINES-2, 0, &*split_time(time));
-            self.prev_song_num = playlist.song_index;
-            self.prev_time = time;
+            let mut song_name = String::from(playlist.get_curr_song().unwrap_or(""));
+            if song_name.len() > COLS as usize {
+                song_name = format!("{}...", &song_name[..(COLS-3) as usize]);
+            }
+            mvprintw(LINES-4, 0, &*format!("{:^1$}", song_name, COLS as usize));
 
-            for (x, i) in playlist.songs.iter().zip(0..) {
+            // list of songs
+            let mut song_list;
+            if playlist.songs.len() > (LINES-4) as usize {
+                let mut to_take = (playlist.song_index - (LINES-4)/2);
+                if playlist.songs.len() as i32 - to_take < LINES-4 {
+                    to_take = playlist.songs.len() as i32 - (LINES-4);
+                }
+                if to_take < 0 {
+                    to_take = 0;
+                }
+                song_list = playlist.songs.iter().skip(to_take as usize);
+            }
+            else {
+                song_list = playlist.songs.iter().skip(0);
+            }
+            for i in 0..LINES-4 {
+                let tmp = String::new();
+                let x = song_list.next().unwrap_or(&tmp);
                 match x == playlist.get_curr_song().unwrap_or("") {
                     false => {},
                     true => {attron(COLOR_PAIR(2));},
@@ -111,30 +113,43 @@ impl UI {
                 if x.len() > COLS as usize {
                     visable = format!("{}...", &x[..(COLS-3) as usize]);
                 }
+                else {
+                    visable = format!("{:<1$}", x, COLS as usize);
+                }
 
                 mvprintw(i, 0, &*visable);
                 attron(COLOR_PAIR(1));
             }
 
-            // progress bar
-            mvprintw(LINES-1, 0, &*format!("{:#<1$}{0:<2$}", "", squares, COLS as usize-squares));
-
+            self.prev_song_num = playlist.song_index;
         }
 
         else if time != self.prev_time {
             // redraw the progress bar and times
-
-            // end time
-            mvprintw(LINES-2, 0, &*format!("{:>1$}", split_time(totaltime), COLS as usize));
-            // current time
-            mvprintw(LINES-2, 0, &*split_time(time));
-            self.prev_time = time;
-
-            // progress bar
-            mvprintw(LINES-1, 0, &*format!("{:#<1$}{0:<2$}", "", squares, COLS as usize-squares));
+            self.draw_times_and_bar(time, totaltime);
         }
 
         refresh();
         return UIResult::NA;
+    }
+
+    fn draw_times_and_bar(&mut self, time: i32, totaltime: i32) {
+            let squares;
+
+            if time == 0 || totaltime == 0 {
+                squares = 0;
+            }
+            else {
+                squares = (time as f64 / totaltime as f64 * COLS as f64) as usize;
+            }
+
+            // end time
+            mvprintw(LINES-3, 0, &*format!("{:>1$}", split_time(totaltime), COLS as usize));
+            // current time
+            mvprintw(LINES-3, 0, &*split_time(time));
+            self.prev_time = time;
+
+            // progress bar
+            mvprintw(LINES-2, 0, &*format!("{:#<1$}{0:<2$}", "", squares, COLS as usize-squares));
     }
 }
