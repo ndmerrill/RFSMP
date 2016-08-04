@@ -11,18 +11,16 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-use std::sync::mpsc as cc;
+
 pub struct Playlist {
     pub songs: Vec<String>,
     pub song_index: i32,
-    sender: cc::Sender<i32>,
 }
 
 impl Playlist {
-    pub fn new(songs: Vec<String>, sender: cc::Sender<i32>) -> Playlist {
+    pub fn new(songs: Vec<String>) -> Playlist {
         Playlist{songs: songs,
-                 song_index: -1,
-                 sender: sender}
+                 song_index: -1}
     }
 
     // Returns the next song that should be played.
@@ -37,12 +35,10 @@ impl Playlist {
     // next one.
     pub fn go_to_next(&mut self) {
         self.song_index += 1;
-        self.sender.send(self.song_index);
     }
 
     // Tells playlist to go back to the song before.
     pub fn go_to_prev(&mut self) {
-        self.sender.send(self.song_index);
         self.song_index -= 1;
     }
 

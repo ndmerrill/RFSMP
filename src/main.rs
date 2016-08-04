@@ -11,7 +11,6 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-extern crate rustty;
 extern crate gst;
 extern crate argparse;
 extern crate regex;
@@ -27,9 +26,7 @@ use gst::ElementT;
 use std::fs;
 use std::io;
 use ncurses::*;
-use std::thread;
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc;
+
 // Takes a list of songs and directories the user wants to play and recurses
 // through the directories, replacing them in the list with the songs inside
 // them.
@@ -75,7 +72,6 @@ fn recurse_songs(songs: &mut Vec<String>, recurse: bool, is_first: bool) ->
     }
     songs.clear();
     songs.append(&mut new);
-    songs.sort();
     Ok(())
 }
 
@@ -89,19 +85,14 @@ enum LoopResult {
 fn loop_main (bus_receiver: gst::bus::Receiver,
               main_loop: &mut gst::mainloop::MainLoop,
               playbin: &mut gst::PlayBin,
-              playlist: &mut playlist::Playlist,
-              otherreciever: mpsc::Receiver<i32>)-> LoopResult {
-    //hanle comms channel to the ui
-    let (tx, rx) = mpsc::channel();
-    let shared = playlist.songs.clone();
-    thread::spawn(|| {
-        let mut ui = UI::new(tx, otherreciever, shared);
-    });
+              playlist: &mut playlist::Playlist) -> LoopResult {
+    let mut ui = UI::new();
 
     main_loop.spawn();
     playbin.play();
 
     let mut song_buffered = false;
+
     'outer: loop {
         loop {
             match bus_receiver.try_recv() {
@@ -167,85 +158,78 @@ fn loop_main (bus_receiver: gst::bus::Receiver,
             Some(a) => a as i32,
             None => 0,
         };
-        match rx.try_recv() {
-            Err(x) => {/*do nothing*/},
-            Ok(result) => {
-                match result {
-                    UIResult::PlayPause => {
-                        if playbin.is_paused() {
-                            playbin.play();
-                        }
-                        else {
-                            playbin.pause();
-                        }
-                    }
-                    UIResult::Previous => {
-                        playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
-                        playlist.go_to_prev();
-                        playlist.go_to_prev();
-                        match playlist.get_next_song() {
-                            Some(a) => {
-                                let song = match gst::filename_to_uri(a) {
-                                    Ok(a) => a,
-                                    Err(e) => {
-                                        main_loop.quit();
-                                        return LoopResult::Error(format!("URI Error {}",
-                                                                         &e.message()));
-                                    }
-                                };
-                                playbin.set_uri(&song);
-                                song_buffered = true;
-                            }
-                            None => {
-                                main_loop.quit();
-                                return LoopResult::Clean;
-                            }
-                        };
-                        playbin.play();
 
-                    }
-                    UIResult::Next => {
-                        playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
-                        match playlist.get_next_song() {
-                            Some(a) => {
-                                let song = match gst::filename_to_uri(a) {
-                                    Ok(a) => a,
-                                    Err(e) => {
-                                        main_loop.quit();
-                                        return LoopResult::Error(format!("URI Error {}",
-                                                                         &e.message()));
-                                    }
-                                };
-                                playbin.set_uri(&song);
-                                song_buffered = true;
-                            }
-                            None => {
+        match ui.manage_ui(&playlist, stream_pos, stream_dir) {
+            UIResult::PlayPause => {
+                if playbin.is_paused() {
+                    playbin.play();
+                }
+                else {
+                    playbin.pause();
+                }
+            }
+            UIResult::Previous => {
+                playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
+                playlist.go_to_prev();
+                playlist.go_to_prev();
+                match playlist.get_next_song() {
+                    Some(a) => {
+                        let song = match gst::filename_to_uri(a) {
+                            Ok(a) => a,
+                            Err(e) => {
                                 main_loop.quit();
-                                return LoopResult::Clean;
+                                return LoopResult::Error(format!("URI Error {}",
+                                                        &e.message()));
                             }
                         };
-                        playbin.play();
+                        playbin.set_uri(&song);
+                        song_buffered = true;
                     }
-                    UIResult::Exit => {
+                    None => {
                         main_loop.quit();
-                        endwin();
                         return LoopResult::Clean;
                     }
-                    UIResult::Error(a) => {
-                        main_loop.quit();
-                        return LoopResult::Error(a);
+                };
+                playbin.play();
+
+            }
+            UIResult::Next => {
+                playbin.set_state(gst::ffi::GstState::GST_STATE_NULL);
+                match playlist.get_next_song() {
+                    Some(a) => {
+                        let song = match gst::filename_to_uri(a) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                main_loop.quit();
+                                return LoopResult::Error(format!("URI Error {}",
+                                                        &e.message()));
+                            }
+                        };
+                        playbin.set_uri(&song);
+                        song_buffered = true;
                     }
-                    UIResult::NA => {}
-                }
-            },
+                    None => {
+                        main_loop.quit();
+                        return LoopResult::Clean;
+                    }
+                };
+                playbin.play();
+            }
+            UIResult::Exit => {
+                main_loop.quit();
+                return LoopResult::Clean;
+            }
+            UIResult::Error(a) => {
+                main_loop.quit();
+                return LoopResult::Error(a);
+            }
+            UIResult::NA => {}
         }
-        //change to match thread.recv() for none/some, than if its some then match the uiresult
         std::thread::sleep(std::time::Duration::new(0, 20000000));
     }
 }
 
 fn main() {
-
     // Get and parse user arguments.
     let mut regex = String::new();
     let mut songs : Vec<String> = vec![]; // TODO: add with capacity!
@@ -297,8 +281,7 @@ fn main() {
     }
 
     // Initialize everything
-    let (othersender, otherreciever) = mpsc::channel();
-    let mut playlist = playlist::Playlist::new(songs, othersender);
+    let mut playlist = playlist::Playlist::new(songs);
 
     gst::init();
     let mut playbin = match gst::PlayBin::new("audio_player") {
@@ -327,8 +310,9 @@ fn main() {
     bus_receiver = bus.receiver();
 
     // run main loop and handle errors
-    match loop_main(bus_receiver, &mut main_loop, &mut playbin, &mut playlist, otherreciever) {
+    match loop_main(bus_receiver, &mut main_loop, &mut playbin, &mut playlist) {
         LoopResult::Error(e) => println!("{}", e),
         LoopResult::Clean => {}
     }
+    endwin();
 }
