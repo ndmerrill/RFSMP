@@ -14,7 +14,7 @@
 
 [package]
 name = "rfsmp"
-version = "1.0.1"
+version = "1.1.0"
 authors = ["Nathanael Merrill <nathan.d.merrill@gmail.com>"]
 
 [dependencies]

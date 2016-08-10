@@ -1,6 +1,6 @@
 [root]
 name = "rfsmp"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "argparse 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "gstreamer 0.6.333 (registry+https://github.com/rust-lang/crates.io-index)",
