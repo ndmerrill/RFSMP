@@ -21,9 +21,10 @@ mod ncurse_ui;
 use argparse::{ArgumentParser, Store, StoreTrue, List};
 use ncurse_ui::*;
 use regex::Regex;
-use gst::ElementT;
 use std::fs;
 use std::io;
+use std::sync::mpsc::Receiver;
+use gst::Message;
 
 // Takes a list of songs and directories the user wants to play and recurses
 // through the directories, replacing them in the list with the songs inside
@@ -80,7 +81,7 @@ enum LoopResult {
 }
 
 // The main loop. Manages UI communications with gstreamer.
-fn loop_main (bus_receiver: gst::bus::Receiver,
+fn loop_main (bus_receiver: Receiver<Message>,
               main_loop: &mut gst::mainloop::MainLoop,
               playbin: &mut gst::PlayBin,
               playlist: &mut playlist::Playlist) -> LoopResult {

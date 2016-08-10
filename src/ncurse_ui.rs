@@ -150,6 +150,9 @@ impl UI {
             if time == 0 || totaltime == 0 {
                 squares = 0;
             }
+            else if time >= totaltime {
+                squares = COLS as usize;
+            }
             else {
                 squares = (time as f64 / totaltime as f64 * COLS as f64) as usize;
             }
