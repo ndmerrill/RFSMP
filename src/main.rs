@@ -11,20 +11,21 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-extern crate rustty;
 extern crate gst;
 extern crate argparse;
 extern crate regex;
 
 mod playlist;
-mod default_ui;
+mod ncurse_ui;
 
 use argparse::{ArgumentParser, Store, StoreTrue, List};
-use default_ui::*;
+use ncurse_ui::*;
 use regex::Regex;
-use gst::ElementT;
 use std::fs;
+use std::io::prelude::*;
 use std::io;
+use std::sync::mpsc::Receiver;
+use gst::Message;
 
 // Takes a list of songs and directories the user wants to play and recurses
 // through the directories, replacing them in the list with the songs inside
@@ -81,7 +82,7 @@ enum LoopResult {
 }
 
 // The main loop. Manages UI communications with gstreamer.
-fn loop_main (bus_receiver: gst::bus::Receiver,
+fn loop_main (bus_receiver: Receiver<Message>,
               main_loop: &mut gst::mainloop::MainLoop,
               playbin: &mut gst::PlayBin,
               playlist: &mut playlist::Playlist) -> LoopResult {
@@ -277,6 +278,42 @@ fn main() {
             println!("Failed to find songs matching regex patern.");
             return;
         }
+    }
+
+    let re = Regex::new(r"\.[0-9a-zA-Z]+$").expect("");
+    let mut i = 0;
+    let mut del;
+    while i < songs.len() {
+        del = false;
+        match re.find(&songs[i]) {
+            Some((a, b)) => {
+                if &songs[i][a..b].to_lowercase() == ".jpg" ||
+                   &songs[i][a..b].to_lowercase() == ".png" ||
+                   &songs[i][a..b].to_lowercase() == ".mp4" {
+                    print!("Is \"{}\" really an audio file? [y/N] ", songs[i]);
+                    io::stdout().flush().ok().expect("Could not flush stdout");
+                    let mut temp = String::new();
+                    match io::stdin().read_line(&mut temp) {
+                        Ok(_) => {
+                            if temp.trim() != "y" && temp.trim() != "Y" {
+                                songs.remove(i);
+                                del = true;
+                            }
+                        },
+                        Err(_) => return,
+                    }
+                }
+            },
+            None => continue,
+        }
+        if !del {
+            i+=1;
+        }
+    }
+
+    if songs.len() == 0 {
+        println!("No songs left");
+        return;
     }
 
     // Initialize everything
