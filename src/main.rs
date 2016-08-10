@@ -22,6 +22,7 @@ use argparse::{ArgumentParser, Store, StoreTrue, List};
 use ncurse_ui::*;
 use regex::Regex;
 use std::fs;
+use std::io::prelude::*;
 use std::io;
 use std::sync::mpsc::Receiver;
 use gst::Message;
@@ -277,6 +278,42 @@ fn main() {
             println!("Failed to find songs matching regex patern.");
             return;
         }
+    }
+
+    let re = Regex::new(r"\.[0-9a-zA-Z]+$").expect("");
+    let mut i = 0;
+    let mut del;
+    while i < songs.len() {
+        del = false;
+        match re.find(&songs[i]) {
+            Some((a, b)) => {
+                if &songs[i][a..b].to_lowercase() == ".jpg" ||
+                   &songs[i][a..b].to_lowercase() == ".png" ||
+                   &songs[i][a..b].to_lowercase() == ".mp4" {
+                    print!("Is \"{}\" really an audio file? [y/N] ", songs[i]);
+                    io::stdout().flush().ok().expect("Could not flush stdout");
+                    let mut temp = String::new();
+                    match io::stdin().read_line(&mut temp) {
+                        Ok(_) => {
+                            if temp.trim() != "y" && temp.trim() != "Y" {
+                                songs.remove(i);
+                                del = true;
+                            }
+                        },
+                        Err(_) => return,
+                    }
+                }
+            },
+            None => continue,
+        }
+        if !del {
+            i+=1;
+        }
+    }
+
+    if songs.len() == 0 {
+        println!("No songs left");
+        return;
     }
 
     // Initialize everything
