@@ -54,11 +54,11 @@ impl UI {
         init_pair(1, -1, -1);
         init_pair(2, COLOR_YELLOW, -1);
 
-        nodelay(stdscr, true);
+        nodelay(stdscr(), true);
 
         UI {
-            cols: COLS,
-            lines: LINES,
+            cols: COLS(),
+            lines: LINES(),
             prev_time: -1,
             prev_song_num: -1,
         }
@@ -76,9 +76,9 @@ impl UI {
             _ => {},
         }
 
-        if self.cols != COLS || self.lines != LINES {
-            self.cols = COLS;
-            self.lines = LINES;
+        if self.cols != COLS() || self.lines != LINES() {
+            self.cols = COLS();
+            self.lines = LINES();
             self.prev_time = -1;
             self.prev_song_num = -1;
         }
@@ -89,19 +89,19 @@ impl UI {
 
             // song name
             let mut song_name = String::from(playlist.get_curr_song().unwrap_or(""));
-            if song_name.len() > COLS as usize {
-                song_name = format!("{}...", &song_name[..(COLS-3) as usize]);
+            if song_name.len() > COLS() as usize {
+                song_name = format!("{}...", &song_name[..(COLS()-3) as usize]);
             }
-            mvprintw(LINES-4, 0, &*format!("{:^1$}", song_name, COLS as usize));
+            mvprintw(LINES()-4, 0, &*format!("{:^1$}", song_name, COLS() as usize));
 
             // list of songs
 
             // handle scrolling
             let mut song_list;
-            if playlist.songs.len() > (LINES-4) as usize {
-                let mut to_take = playlist.song_index - (LINES-4)/2;
-                if playlist.songs.len() as i32 - to_take < LINES-4 {
-                    to_take = playlist.songs.len() as i32 - (LINES-4);
+            if playlist.songs.len() > (LINES()-4) as usize {
+                let mut to_take = playlist.song_index - (LINES()-4)/2;
+                if playlist.songs.len() as i32 - to_take < LINES()-4 {
+                    to_take = playlist.songs.len() as i32 - (LINES()-4);
                 }
                 if to_take < 0 {
                     to_take = 0;
@@ -113,7 +113,7 @@ impl UI {
             }
 
             // print the songs
-            for i in 0..LINES-4 {
+            for i in 0..LINES()-4 {
                 let tmp = String::new();
                 let x = song_list.next().unwrap_or(&tmp);
                 match x == playlist.get_curr_song().unwrap_or("") {
@@ -121,11 +121,11 @@ impl UI {
                     true => {attron(COLOR_PAIR(2));},
                 };
                 let visable;
-                if x.len() > COLS as usize {
-                    visable = format!("{}...", &x[..(COLS-3) as usize]);
+                if x.len() > COLS() as usize {
+                    visable = format!("{}...", &x[..(COLS()-3) as usize]);
                 }
                 else {
-                    visable = format!("{:<1$}", x, COLS as usize);
+                    visable = format!("{:<1$}", x, COLS() as usize);
                 }
 
                 mvprintw(i, 0, &*visable);
@@ -151,19 +151,19 @@ impl UI {
                 squares = 0;
             }
             else if time >= totaltime {
-                squares = COLS as usize;
+                squares = COLS() as usize;
             }
             else {
-                squares = (time as f64 / totaltime as f64 * COLS as f64) as usize;
+                squares = (time as f64 / totaltime as f64 * COLS() as f64) as usize;
             }
 
             // end time
-            mvprintw(LINES-3, 0, &*format!("{:>1$}", split_time(totaltime), COLS as usize));
+            mvprintw(LINES()-3, 0, &*format!("{:>1$}", split_time(totaltime), COLS() as usize));
             // current time
-            mvprintw(LINES-3, 0, &*split_time(time));
+            mvprintw(LINES()-3, 0, &*split_time(time));
             self.prev_time = time;
 
             // progress bar
-            mvprintw(LINES-2, 0, &*format!("{:#<1$}{0:<2$}", "", squares, COLS as usize-squares));
+            mvprintw(LINES()-2, 0, &*format!("{:#<1$}{0:<2$}", "", squares, COLS() as usize-squares));
     }
 }
